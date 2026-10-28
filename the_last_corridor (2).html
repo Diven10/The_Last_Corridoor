@@ -1,0 +1,2592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>THE LAST CORRIDOR</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Authentic Classical Serif Typography -->
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+    <!-- Three.js r128 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        * {
+            -webkit-tap-highlight-color: transparent;
+            touch-action: none;
+        }
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            overscroll-behavior: none;
+            background-color: #050507;
+            font-family: 'Cormorant Garamond', Georgia, serif;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        .font-medieval {
+            font-family: 'Cinzel', serif;
+        }
+        .tabular-nums {
+            font-variant-numeric: tabular-nums;
+        }
+        #canvas-container {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+        /* Atmospheric Dungeon Vignette */
+        .vignette {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            z-index: 2;
+            background: radial-gradient(circle at center, transparent 45%, rgba(2, 2, 3, 0.92) 100%);
+            transition: box-shadow 0.25s ease;
+        }
+        .damage-flash {
+            box-shadow: inset 0 0 100px rgba(140, 20, 20, 0.85) !important;
+        }
+        /* Subtle Engraved Double Border for Classic RPG Feel */
+        .rpg-frame {
+            background: rgba(10, 9, 8, 0.92);
+            border: 1px solid #3a3024;
+            outline: 1px solid rgba(90, 72, 50, 0.25);
+            outline-offset: -4px;
+        }
+        /* Portrait Mode Blocker on Mobile */
+        #portrait-warning {
+            display: none;
+        }
+        @media screen and (max-width: 920px) and (orientation: portrait) {
+            #portrait-warning {
+                display: flex !important;
+            }
+        }
+        /* Compact adjustments for mobile landscape */
+        @media screen and (max-height: 500px) {
+            #minimap-canvas {
+                width: 82px !important;
+                height: 82px !important;
+            }
+            .hud-top-left {
+                top: 0.65rem !important;
+                left: 0.85rem !important;
+                width: 11.5rem !important;
+                gap: 0.35rem !important;
+            }
+            .hud-top-right {
+                top: 0.65rem !important;
+                right: 0.85rem !important;
+            }
+            .hud-compass {
+                top: 0.5rem !important;
+            }
+        }
+        ::-webkit-scrollbar {
+            width: 5px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #090807;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #3a3024;
+        }
+    </style>
+</head>
+<body class="text-[#d6cbb9]">
+
+    <!-- Portrait Mode Rotate Prompt for Mobile -->
+    <div id="portrait-warning" class="fixed inset-0 z-50 bg-[#050507] flex-col items-center justify-center p-6 text-center">
+        <div class="rpg-frame p-8 max-w-xs w-full flex flex-col items-center">
+            <svg class="w-12 h-12 text-[#c8aa78] mb-4 animate-pulse" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+                <line x1="12" y1="18" x2="12.01" y2="18"></line>
+            </svg>
+            <h2 class="font-medieval text-lg tracking-[0.2em] uppercase text-[#e0cda9] mb-2">Rotate Device</h2>
+            <p class="text-sm italic text-[#b8ab96] leading-relaxed">
+                The Last Corridor is forged for landscape orientation. Turn your phone sideways for twin-stick touch controls.
+            </p>
+        </div>
+    </div>
+
+    <!-- 3D WebGL Canvas Container -->
+    <div id="canvas-container"></div>
+    <div class="vignette"></div>
+
+    <!-- Centered Minimalist Pinpoint Crosshair -->
+    <div id="crosshair" class="fixed inset-0 pointer-events-none z-10 flex items-center justify-center opacity-70 transition-opacity duration-200">
+        <div id="reticle-dot" class="w-1 h-1 rounded-full bg-[#e5dccb] transition-transform duration-150"></div>
+        <div id="reticle-ring" class="absolute w-3.5 h-3.5 rounded-full border border-stone-400/0 transition-all duration-200"></div>
+    </div>
+
+    <!-- Center-Screen Engraved Text Banner -->
+    <div class="fixed inset-x-0 top-1/4 pointer-events-none z-10 flex flex-col items-center justify-center px-4">
+        <div id="toast-message" class="opacity-0 transform -translate-y-1 transition-all duration-500 font-medieval tracking-[0.22em] uppercase text-xs sm:text-sm md:text-base text-[#e2c792] drop-shadow-[0_2px_6px_rgba(0,0,0,0.95)] border-y border-[#785c38]/40 bg-gradient-to-r from-transparent via-black/80 to-transparent px-8 sm:px-12 py-1.5 sm:py-2 text-center">
+            Ancient Key Acquired
+        </div>
+    </div>
+
+    <!-- Bottom Center Subtle Interaction Prompt -->
+    <div class="fixed inset-x-0 bottom-12 sm:bottom-20 pointer-events-none z-10 flex justify-center px-4">
+        <div id="proximity-prompt" class="hidden text-[#d8c8b0] italic text-sm sm:text-base md:text-lg tracking-wide drop-shadow-[0_2px_4px_rgba(0,0,0,1)] bg-gradient-to-r from-transparent via-black/75 to-transparent px-6 py-1 text-center">
+            Barred Oak Gate — Requires 2 Wrought-Iron Keys
+        </div>
+    </div>
+
+    <!-- Top-Left Diegetic Status & Resource Bars -->
+    <div class="hud-top-left fixed top-5 left-6 z-10 pointer-events-none select-none flex flex-col gap-2.5 w-52 sm:w-64">
+        <!-- Torch Flame Lifespan Bar -->
+        <div>
+            <div class="flex justify-between items-baseline text-[10px] sm:text-[11px] font-medieval tracking-[0.18em] text-[#b8a68e] mb-1 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
+                <span>TORCH FLAME</span>
+                <span id="hud-timer" class="tabular-nums text-[#d8b880]">90s</span>
+            </div>
+            <div class="h-1.5 w-full bg-[#090807]/90 border border-[#3d3124] p-[1px]">
+                <div id="hud-torch-bar" class="h-full bg-gradient-to-r from-[#7c2d12] via-[#c2611b] to-[#e09f3e] transition-all duration-150" style="width: 100%"></div>
+            </div>
+        </div>
+
+        <!-- Stamina Bar -->
+        <div>
+            <div class="h-1 w-4/5 bg-[#090807]/90 border border-[#2c251d] p-[1px]">
+                <div id="hud-stamina-bar" class="h-full bg-[#84947b] transition-all duration-75" style="width: 100%"></div>
+            </div>
+        </div>
+
+        <!-- Inventory Tally (Keys & Chalk Stones) -->
+        <div class="flex items-center gap-3 sm:gap-4 pt-0.5 text-[11px] sm:text-xs font-medieval tracking-[0.14em] text-[#c7b9a1] drop-shadow-[0_1px_3px_rgba(0,0,0,0.95)]">
+            <div class="flex items-center gap-1.5">
+                <span class="text-[#8c7e6a]">DEPTH</span>
+                <span id="hud-level" class="tabular-nums text-[#e0cda9]">I</span>
+            </div>
+            <div class="h-3 w-px bg-[#3a3024]"></div>
+            <div class="flex items-center gap-2">
+                <span class="text-[#8c7e6a]">KEYS</span>
+                <div id="hud-keys-container" class="flex items-center gap-1.5"></div>
+            </div>
+            <div class="h-3 w-px bg-[#3a3024]"></div>
+            <div class="flex items-center gap-1.5">
+                <span class="text-[#8c7e6a]">CHALK</span>
+                <span id="hud-embers" class="tabular-nums text-[#d6cbb9]">12</span>
+            </div>
+        </div>
+
+        <!-- Gate Seal Text Line -->
+        <div id="portal-status-text" class="hidden sm:block text-[11px] italic text-[#9e8c74] tracking-wider drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
+            The oak gate remains barred.
+        </div>
+    </div>
+
+    <!-- Top-Center Minimal Etched Compass Ribbon -->
+    <div class="hud-compass fixed top-5 inset-x-0 z-10 pointer-events-none flex justify-center px-4">
+        <div class="relative w-52 sm:w-80 h-6 border-b border-[#4a3c2c]/60 bg-gradient-to-r from-transparent via-black/55 to-transparent overflow-hidden">
+            <canvas id="compass-canvas" width="320" height="24" class="w-full h-full block"></canvas>
+            <!-- Center Needle Hairline -->
+            <div class="absolute bottom-0 left-1/2 -translate-x-1/2 w-px h-2 bg-[#c8aa78]/80"></div>
+        </div>
+    </div>
+
+    <!-- Top-Right Hand-Drawn Charcoal & Parchment Map + Discreet Text Links -->
+    <div class="hud-top-right fixed top-5 right-6 z-10 flex flex-col items-end gap-1.5">
+        <div class="flex items-center gap-2.5 text-[9px] sm:text-[10px] font-medieval tracking-[0.18em] uppercase text-[#8c7e6a] pointer-events-auto">
+            <button id="btn-fullscreen" class="hover:text-[#d8c8b0] transition">Fullscreen</button>
+            <span>/</span>
+            <button id="btn-mute" class="hover:text-[#d8c8b0] transition">Audio: On</button>
+            <span>/</span>
+            <button id="btn-regenerate" class="hover:text-[#d8c8b0] transition">Reset</button>
+            <span class="hidden sm:inline">/</span>
+            <button id="btn-viva" class="hidden sm:inline hover:text-[#d8c8b0] transition">Notes</button>
+        </div>
+
+        <!-- Aged Parchment Map Sketch -->
+        <div class="pointer-events-none p-1 bg-[#14100c]/90 border border-[#3e3122] shadow-[0_10px_25px_rgba(0,0,0,0.9)]">
+            <canvas id="minimap-canvas" width="116" height="116" class="block border border-[#292016]"></canvas>
+            <div class="flex justify-between items-center pt-0.5 px-0.5 text-[8px] sm:text-[9px] font-medieval tracking-[0.15em] text-[#7c6d58]">
+                <span>SURVEY</span>
+                <span id="minimap-explored" class="tabular-nums">0%</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom-Left Desktop Control Hints (Hidden on Touch Devices) -->
+    <div id="desktop-hints" class="fixed bottom-4 left-6 z-10 hidden lg:block pointer-events-none text-xs italic text-[#7c6f5d] tracking-wider drop-shadow-[0_1px_2px_rgba(0,0,0,0.95)]">
+        WASD: Walk &nbsp;·&nbsp; Shift: Run &nbsp;·&nbsp; F: Mark Floor &nbsp;·&nbsp; E / Click: Strike Wall
+    </div>
+
+    <!-- MOBILE LANDSCAPE TWIN-STICK & TOUCH LOOK INTERFACE -->
+    <div id="mobile-controls" class="fixed inset-0 z-10 pointer-events-none lg:hidden">
+        <!-- Left Thumb Virtual Analog Joystick -->
+        <div id="joystick-zone" class="pointer-events-auto absolute bottom-5 left-6 w-28 h-28 sm:w-32 sm:h-32 rounded-full bg-[#0b0907]/65 border border-[#4a3c2c]/80 flex items-center justify-center shadow-[0_0_25px_rgba(0,0,0,0.85)]">
+            <!-- Subtle Inner Ring -->
+            <div class="w-16 h-16 rounded-full border border-[#3a2e21]/50 pointer-events-none"></div>
+            <!-- Movable Thumb Knob -->
+            <div id="joystick-knob" class="absolute w-11 h-11 rounded-full bg-[#241c14]/90 border border-[#8c7250] shadow-[0_2px_10px_rgba(0,0,0,0.9)] pointer-events-none flex items-center justify-center">
+                <div class="w-2 h-2 rotate-45 bg-[#c8aa78]"></div>
+            </div>
+        </div>
+
+        <!-- Right-Side Look Touch Zone (Drag anywhere on the right/center screen to look around) -->
+        <div id="look-touch-zone" class="pointer-events-auto absolute inset-y-0 left-36 right-0"></div>
+
+        <!-- Right Thumb Ergonomic Action Cluster -->
+        <div class="pointer-events-auto absolute bottom-5 right-6 flex items-end gap-2.5 select-none">
+            <!-- Drop Chalk Marker -->
+            <button id="btn-touch-ember" class="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-[#120f0c]/85 active:bg-[#2b2218] border border-[#5c4a35] flex flex-col items-center justify-center text-[#d8c8b0] shadow-lg">
+                <span class="font-medieval text-[9px] tracking-widest uppercase">Chalk</span>
+            </button>
+
+            <!-- Strike / Bash Cracked Wall -->
+            <button id="btn-touch-bash" class="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-[#1a130d]/90 active:bg-[#38291b] border border-[#7c6143] flex flex-col items-center justify-center text-[#e2c792] shadow-lg mb-2">
+                <span class="font-medieval text-[10px] tracking-widest uppercase">Strike</span>
+            </button>
+
+            <!-- Hold or Toggle Sprint -->
+            <button id="btn-touch-sprint" class="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-[#120f0c]/85 active:bg-[#2c3327] border border-[#54634c] flex flex-col items-center justify-center text-[#b8c9b0] shadow-lg">
+                <span class="font-medieval text-[10px] tracking-widest uppercase">Run</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Modal Overlay (Start, Pause, Victory, Game Over — Classic Engraved Frame) -->
+    <div id="overlay-screen" class="fixed inset-0 z-20 flex items-center justify-center p-3 sm:p-4 bg-black/85 transition-opacity duration-300">
+        <div class="max-w-md w-full rpg-frame p-5 sm:p-8 md:p-10 text-center shadow-[0_25px_70px_rgba(0,0,0,1)]">
+            <div id="modal-badge" class="text-[#8c7960] text-[9px] sm:text-[10px] font-medieval tracking-[0.28em] uppercase mb-1.5">
+                Catacombs Beneath the Keep
+            </div>
+            <h2 id="modal-title" class="font-medieval text-xl sm:text-2xl md:text-3xl font-normal text-[#e0cda9] tracking-[0.16em] uppercase mb-2">
+                The Last Corridor
+            </h2>
+            <div class="w-16 h-px bg-[#54432e] mx-auto mb-3 sm:mb-5"></div>
+            <p id="modal-desc" class="text-sm sm:text-base text-[#b8ab96] leading-relaxed mb-4 sm:mb-6 italic">
+                Two wrought-iron keys lie hidden within the lower vaults. Recover them and unbar the heavy oak gate before your torch gutters out.
+            </p>
+
+            <!-- Restrained Two-Line Field Guide -->
+            <div class="border-y border-[#2d241b] py-2.5 mb-5 sm:mb-7 text-[10px] sm:text-xs font-medieval tracking-[0.12em] text-[#8c7e6a] space-y-1 uppercase">
+                <div class="hidden sm:block">WASD: Move &nbsp;·&nbsp; Shift: Sprint &nbsp;·&nbsp; Mouse: Look</div>
+                <div class="sm:hidden">Left Stick: Move &nbsp;·&nbsp; Drag Screen: Look Around</div>
+                <div>Chalk: Mark Floor &nbsp;·&nbsp; Strike: Break Fractured Wall</div>
+            </div>
+
+            <div class="flex flex-row gap-3 justify-center">
+                <button id="btn-primary-action" class="w-full py-2.5 px-6 bg-[#1c1610] hover:bg-[#292017] active:bg-[#382b1e] border border-[#6e563a] text-[#e0cda9] font-medieval text-xs tracking-[0.24em] uppercase transition">
+                    Descend
+                </button>
+                <button id="btn-secondary-restart" class="hidden w-full sm:w-auto py-2.5 px-5 bg-[#120e0a] hover:bg-[#1f1912] border border-[#3d3124] text-[#9e8f79] font-medieval text-xs tracking-[0.2em] uppercase transition">
+                    New Crypt
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Technical & Graphics Viva Drawer -->
+    <aside id="viva-drawer" class="fixed inset-y-0 right-0 z-30 w-full max-w-xl bg-[#0b0a08]/95 border-l border-[#3a3024] transform translate-x-full transition-transform duration-300 flex flex-col">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-[#29221a]">
+            <div>
+                <h2 class="font-medieval text-sm tracking-[0.18em] uppercase text-[#d8c8b0]">Engine &amp; Graphics Notes</h2>
+            </div>
+            <button id="btn-close-viva" class="px-3 py-1 border border-[#3a3024] hover:border-[#6e563a] text-[#b8a68e] font-medieval text-[10px] tracking-widest uppercase">
+                Close
+            </button>
+        </div>
+
+        <div class="p-6 overflow-y-auto space-y-5 text-base leading-relaxed text-[#b8ab96]">
+            <div class="border-b border-[#241e17] pb-4">
+                <h3 class="text-[#d8c8b0] font-medieval text-xs tracking-[0.15em] uppercase mb-1.5">1. First-Person Perspective &amp; Multi-Touch Camera</h3>
+                <p class="text-sm">
+                    Uses a <code class="text-[#c8aa78]">THREE.PerspectiveCamera(75, aspect, 0.1, 42)</code> at human eye height (<code class="text-[#c8aa78]">1.65m</code>). Supports both desktop PointerLock mouse-look and multi-touch drag-to-look with simultaneous analog thumbstick movement.
+                </p>
+            </div>
+
+            <div class="border-b border-[#241e17] pb-4">
+                <h3 class="text-[#d8c8b0] font-medieval text-xs tracking-[0.15em] uppercase mb-1.5">2. Procedural PBR Materials (Albedo, Normal &amp; Roughness)</h3>
+                <p class="text-sm">
+                    Synthesizes tileable <code class="text-[#c8aa78]">CanvasTexture</code> maps at startup: weathered ashlar masonry, tangent-space normal maps derived from finite-difference height gradients $(\partial h/\partial x, \partial h/\partial y)$, and roughness maps for porous stone and wrought iron.
+                </p>
+            </div>
+
+            <div class="border-b border-[#241e17] pb-4">
+                <h3 class="text-[#d8c8b0] font-medieval text-xs tracking-[0.15em] uppercase mb-1.5">3. Dynamic Torch Attenuation &amp; Spatial Audio</h3>
+                <p class="text-sm">
+                    Combines exponential distance fog (<code class="text-[#c8aa78]">THREE.FogExp2</code>) with a shadow-casting point light whose radius scales with remaining fuel, alongside procedural Web Audio synthesis for stone footsteps and gate mechanisms.
+                </p>
+            </div>
+
+            <div>
+                <h3 class="text-[#d8c8b0] font-medieval text-xs tracking-[0.15em] uppercase mb-1.5">4. Axis-Separated Circle-vs-AABB Collision</h3>
+                <p class="text-sm">
+                    Resolves X and Z displacements independently against a <code class="text-[#c8aa78]">0.44m</code> bounding cylinder so the player slides smoothly along walls without camera clipping.
+                </p>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main First-Person 3D Game Engine -->
+    <script>
+        (function () {
+            'use strict';
+
+            // ============================================================================
+            // 1. CORE CONFIGURATION & PROGRESSIVE LEVEL SYSTEM
+            // ============================================================================
+            let currentLevel = 1;
+            let GRID_SIZE = 11;
+            const TILE_SIZE = 3.6;
+            const WALL_HEIGHT = 3.8;
+            const EYE_HEIGHT = 1.65;
+            const PLAYER_RADIUS = 0.44;
+            const MOVE_SPEED = 4.6;
+            const SPRINT_MULTIPLIER = 1.62;
+            const TURN_SPEED = 2.0;
+            const MOUSE_SENSITIVITY = 0.0021;
+            const TOUCH_LOOK_SENSITIVITY = 0.0046;
+            let ROUND_TIME_SEC = 90.0;
+            let TOTAL_KEYS = 2;
+            let MAX_EMBERS = 12;
+            let NUM_TRAPS = 2;
+            let NUM_OIL_POTS = 3;
+
+            const LEVEL_TITLES = [
+                'The Outer Catacombs',
+                'The Drowned Ossuary',
+                'Vault of the Blind Mason',
+                'The Iron Penitentiary',
+                'Sanctum of Eternal Ash',
+                'The Abyssal Labyrinth'
+            ];
+
+            function toRoman(num) {
+                const map = [
+                    [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']
+                ];
+                let res = '';
+                let n = num;
+                for (const [val, sym] of map) {
+                    while (n >= val) {
+                        res += sym;
+                        n -= val;
+                    }
+                }
+                return res || String(num);
+            }
+
+            function applyLevelParameters(lvl) {
+                currentLevel = Math.max(1, lvl);
+                // Grid grows by +2 every level (must be odd for DFS maze: 11, 13, 15, 17, 19)
+                GRID_SIZE = Math.min(19, 11 + (currentLevel - 1) * 2);
+                // Keys required increases as you descend (2 -> 3 -> 3 -> 4 -> 5)
+                TOTAL_KEYS = Math.min(5, 2 + Math.floor(currentLevel / 2));
+                // Torch fuel increases slightly for bigger mazes, but time-per-tile gets much tighter!
+                ROUND_TIME_SEC = Math.max(70, 90 + (currentLevel - 1) * 12);
+                // More spike traps on deeper floors
+                NUM_TRAPS = Math.min(12, 2 + (currentLevel - 1) * 2);
+                // Oil braziers become scarcer relative to maze size
+                NUM_OIL_POTS = Math.max(1, 3 - Math.floor((currentLevel - 1) / 3));
+                // Chalk stones scale modestly
+                MAX_EMBERS = Math.max(8, 12 + (currentLevel - 1));
+            }
+
+            const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+
+            const STATE = {
+                START: 'START',
+                PLAYING: 'PLAYING',
+                PAUSED: 'PAUSED',
+                WON: 'WON',
+                LOST: 'LOST'
+            };
+
+            let currentState = STATE.START;
+            let timeRemaining = ROUND_TIME_SEC;
+            let keysCollected = 0;
+
+            // Player First-Person State
+            const player = {
+                x: 0,
+                y: EYE_HEIGHT,
+                z: 0,
+                yaw: 0,
+                pitch: 0,
+                bobPhase: 0,
+                lastStepSin: 0,
+                isMoving: false,
+                isSprinting: false,
+                stamina: 100,
+                embersLeft: MAX_EMBERS,
+                keyAnimTimer: 0,
+                bashAnimTimer: 0
+            };
+
+            // Input Tracking (Keyboard + Analog Virtual Joystick)
+            const input = {
+                forward: false,
+                backward: false,
+                left: false,
+                right: false,
+                turnLeft: false,
+                turnRight: false,
+                sprint: false,
+                joyX: 0, // Analog left/right (-1 to 1)
+                joyY: 0  // Analog forward/back (-1 to 1)
+            };
+
+            let isPointerLocked = false;
+            let suppressNextUnlockPause = false;
+
+            // World & Maze Collections
+            let mazeGrid = [];
+            let exploredGrid = [];
+            let wallBoxes = [];
+            let breakableWalls = [];
+            let keyObjects = [];
+            let oilPots = [];
+            let spikeTraps = [];
+            let emberCrumbs = [];
+            let torchLights = [];
+            let exitGate = null;
+            let dustSystem = null;
+
+            // ============================================================================
+            // 1B. PROCEDURAL WEB AUDIO API SOUND SYNTHESIZER
+            // ============================================================================
+            const sfx = {
+                ctx: null,
+                muted: false,
+                humOsc: null,
+                humGain: null,
+                init() {
+                    if (this.ctx) {
+                        if (this.ctx.state === 'suspended') this.ctx.resume();
+                        return;
+                    }
+                    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    if (!AudioCtx) return;
+                    this.ctx = new AudioCtx();
+
+                    this.humOsc = this.ctx.createOscillator();
+                    this.humGain = this.ctx.createGain();
+                    this.humOsc.type = 'sine';
+                    this.humOsc.frequency.value = 432;
+                    this.humGain.gain.value = 0.0;
+                    this.humOsc.connect(this.humGain);
+                    this.humGain.connect(this.ctx.destination);
+                    this.humOsc.start();
+                },
+                playFootstep(sprinting) {
+                    if (this.muted || !this.ctx) return;
+                    const now = this.ctx.currentTime;
+                    const bufferSize = this.ctx.sampleRate * 0.065;
+                    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                    const data = buffer.getChannelData(0);
+                    for (let i = 0; i < bufferSize; i++) {
+                        data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.35));
+                    }
+                    const noise = this.ctx.createBufferSource();
+                    noise.buffer = buffer;
+
+                    const filter = this.ctx.createBiquadFilter();
+                    filter.type = 'bandpass';
+                    filter.frequency.value = sprinting ? 320 + Math.random() * 90 : 220 + Math.random() * 70;
+                    filter.Q.value = 1.8;
+
+                    const gain = this.ctx.createGain();
+                    gain.gain.setValueAtTime(sprinting ? 0.18 : 0.11, now);
+                    gain.gain.exponentialRampToValueAtTime(0.005, now + 0.065);
+
+                    noise.connect(filter);
+                    filter.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    noise.start(now);
+                },
+                playKeyPickup() {
+                    if (this.muted || !this.ctx) return;
+                    const now = this.ctx.currentTime;
+                    [587.33, 880, 1174.66].forEach((freq, idx) => {
+                        const osc = this.ctx.createOscillator();
+                        const gain = this.ctx.createGain();
+                        osc.type = 'triangle';
+                        osc.frequency.setValueAtTime(freq, now + idx * 0.06);
+                        gain.gain.setValueAtTime(0.18, now + idx * 0.06);
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.06 + 0.55);
+                        osc.connect(gain);
+                        gain.connect(this.ctx.destination);
+                        osc.start(now + idx * 0.06);
+                        osc.stop(now + idx * 0.06 + 0.56);
+                    });
+                },
+                playGateUnbar() {
+                    if (this.muted || !this.ctx) return;
+                    const now = this.ctx.currentTime;
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(92, now);
+                    osc.frequency.linearRampToValueAtTime(55, now + 0.85);
+                    gain.gain.setValueAtTime(0.22, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.9);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.92);
+                },
+                playOilFlare() {
+                    if (this.muted || !this.ctx) return;
+                    const now = this.ctx.currentTime;
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(240, now);
+                    osc.frequency.exponentialRampToValueAtTime(620, now + 0.32);
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.36);
+                },
+                playEmberDrop() {
+                    if (this.muted || !this.ctx) return;
+                    const now = this.ctx.currentTime;
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(980, now);
+                    osc.frequency.exponentialRampToValueAtTime(660, now + 0.18);
+                    gain.gain.setValueAtTime(0.12, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.21);
+                },
+                playWallBash() {
+                    if (this.muted || !this.ctx) return;
+                    const now = this.ctx.currentTime;
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(135, now);
+                    osc.frequency.exponentialRampToValueAtTime(38, now + 0.35);
+                    gain.gain.setValueAtTime(0.28, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.38);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.4);
+                },
+                playSpikeTrap() {
+                    if (this.muted || !this.ctx) return;
+                    const now = this.ctx.currentTime;
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(520, now);
+                    osc.frequency.exponentialRampToValueAtTime(110, now + 0.28);
+                    gain.gain.setValueAtTime(0.26, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.32);
+                },
+                updateSpatialHum(minKeyDist, elapsed) {
+                    if (!this.ctx || !this.humGain) return;
+                    if (this.muted || currentState !== STATE.PLAYING || minKeyDist > 9.5) {
+                        this.humGain.gain.setTargetAtTime(0.0, this.ctx.currentTime, 0.1);
+                        return;
+                    }
+                    const proximity = Math.max(0, 1 - minKeyDist / 9.5);
+                    const pulse = (Math.sin(elapsed * 6.0) * 0.3 + 0.7) * proximity * 0.055;
+                    this.humOsc.frequency.setTargetAtTime(420 + proximity * 140, this.ctx.currentTime, 0.08);
+                    this.humGain.gain.setTargetAtTime(pulse, this.ctx.currentTime, 0.08);
+                }
+            };
+
+            // ============================================================================
+            // 2. PROCEDURAL PBR TEXTURE & NORMAL MAP GENERATOR
+            // ============================================================================
+            function createPBRTextureSet(width, height, drawHeightAndColorFn, repeatX, repeatY, bumpStrength = 2.5) {
+                const albedoCanvas = document.createElement('canvas');
+                albedoCanvas.width = width;
+                albedoCanvas.height = height;
+                const albedoCtx = albedoCanvas.getContext('2d');
+
+                const roughCanvas = document.createElement('canvas');
+                roughCanvas.width = width;
+                roughCanvas.height = height;
+                const roughCtx = roughCanvas.getContext('2d');
+
+                const heightData = new Float32Array(width * height);
+
+                drawHeightAndColorFn(albedoCtx, roughCtx, heightData, width, height);
+
+                const normalCanvas = document.createElement('canvas');
+                normalCanvas.width = width;
+                normalCanvas.height = height;
+                const normalCtx = normalCanvas.getContext('2d');
+                const normalImg = normalCtx.createImageData(width, height);
+                const nData = normalImg.data;
+
+                for (let y = 0; y < height; y++) {
+                    const yUp = (y - 1 + height) % height;
+                    const yDown = (y + 1) % height;
+                    for (let x = 0; x < width; x++) {
+                        const xLeft = (x - 1 + width) % width;
+                        const xRight = (x + 1) % width;
+
+                        const dX = (heightData[y * width + xRight] - heightData[y * width + xLeft]) * bumpStrength;
+                        const dY = (heightData[yDown * width + x] - heightData[yUp * width + x]) * bumpStrength;
+
+                        let nx = -dX;
+                        let ny = -dY;
+                        let nz = 1.0;
+                        const invLen = 1.0 / Math.sqrt(nx * nx + ny * ny + nz * nz);
+                        nx *= invLen;
+                        ny *= invLen;
+                        nz *= invLen;
+
+                        const idx = (y * width + x) * 4;
+                        nData[idx] = Math.floor((nx * 0.5 + 0.5) * 255);
+                        nData[idx + 1] = Math.floor((ny * 0.5 + 0.5) * 255);
+                        nData[idx + 2] = Math.floor((nz * 0.5 + 0.5) * 255);
+                        nData[idx + 3] = 255;
+                    }
+                }
+                normalCtx.putImageData(normalImg, 0, 0);
+
+                const wrapAndRepeat = (canvas) => {
+                    const tex = new THREE.CanvasTexture(canvas);
+                    tex.wrapS = THREE.RepeatWrapping;
+                    tex.wrapT = THREE.RepeatWrapping;
+                    tex.repeat.set(repeatX, repeatY);
+                    return tex;
+                };
+
+                return {
+                    map: wrapAndRepeat(albedoCanvas),
+                    normalMap: wrapAndRepeat(normalCanvas),
+                    roughnessMap: wrapAndRepeat(roughCanvas)
+                };
+            }
+
+            function hash2D(x, y) {
+                const n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453123;
+                return n - Math.floor(n);
+            }
+
+            function buildDungeonMaterials() {
+                const wallTex = createPBRTextureSet(256, 256, (albedoCtx, roughCtx, heightData, w, h) => {
+                    const aImg = albedoCtx.createImageData(w, h);
+                    const rImg = roughCtx.createImageData(w, h);
+                    const rows = 8;
+                    const rowH = h / rows;
+
+                    for (let y = 0; y < h; y++) {
+                        const row = Math.floor(y / rowH);
+                        const yInRow = y % rowH;
+                        const cols = (row % 2 === 0) ? 4 : 5;
+                        const colW = w / cols;
+                        const xOffset = (row % 2) * (colW * 0.5);
+
+                        for (let x = 0; x < w; x++) {
+                            const shiftedX = (x + xOffset) % w;
+                            const col = Math.floor(shiftedX / colW);
+                            const xInCol = shiftedX % colW;
+
+                            const blockSeed = hash2D(col + row * 13, row * 7);
+                            const fineNoise = hash2D(x * 0.5, y * 0.5);
+                            const microNoise = hash2D(x, y);
+
+                            const edgeWarble = (fineNoise - 0.5) * 2.2;
+                            const distToMortarY = Math.min(yInRow, rowH - yInRow) + edgeWarble;
+                            const distToMortarX = Math.min(xInCol, colW - xInCol) + edgeWarble;
+                            const minMortarDist = Math.min(distToMortarX, distToMortarY);
+
+                            let heightVal = 0.75;
+                            let r = 56, g = 53, b = 49;
+                            let rough = 225;
+
+                            if (minMortarDist < 2.3) {
+                                heightVal = 0.12 + microNoise * 0.08;
+                                r = 24; g = 22; b = 20;
+                                rough = 248;
+                            } else {
+                                const bevel = Math.min(1.0, (minMortarDist - 2.3) / 4.5);
+                                const crackWave = Math.abs(((x + y * 1.3 + blockSeed * 40) % 64) - 32);
+                                const isCrack = (blockSeed > 0.55 && crackWave < 1.1) ? 0.25 : 0.0;
+
+                                heightVal = (0.35 + 0.55 * bevel) - isCrack + (fineNoise - 0.5) * 0.14 + (microNoise - 0.5) * 0.07;
+
+                                const shade = 0.78 + blockSeed * 0.35 + (fineNoise - 0.5) * 0.16 - isCrack * 0.5;
+                                r = Math.floor(66 * shade);
+                                g = Math.floor(62 * shade);
+                                b = Math.floor(56 * shade);
+
+                                const mossFactor = (y > h * 0.68 && fineNoise > 0.52) ? 0.35 : 0;
+                                if (mossFactor > 0) {
+                                    r = Math.floor(r * 0.72);
+                                    g = Math.floor(g * 0.96 + 10);
+                                    b = Math.floor(b * 0.68);
+                                }
+                                rough = Math.floor(205 + (1 - shade) * 38);
+                            }
+
+                            heightData[y * w + x] = heightVal;
+                            const idx = (y * w + x) * 4;
+                            aImg.data[idx] = Math.min(255, Math.max(0, r));
+                            aImg.data[idx + 1] = Math.min(255, Math.max(0, g));
+                            aImg.data[idx + 2] = Math.min(255, Math.max(0, b));
+                            aImg.data[idx + 3] = 255;
+
+                            rImg.data[idx] = rough;
+                            rImg.data[idx + 1] = rough;
+                            rImg.data[idx + 2] = rough;
+                            rImg.data[idx + 3] = 255;
+                        }
+                    }
+                    albedoCtx.putImageData(aImg, 0, 0);
+                    roughCtx.putImageData(rImg, 0, 0);
+                }, 1.5, 1.6, 3.2);
+
+                const wallMat = new THREE.MeshStandardMaterial({
+                    map: wallTex.map,
+                    normalMap: wallTex.normalMap,
+                    normalScale: new THREE.Vector2(1.35, 1.35),
+                    roughnessMap: wallTex.roughnessMap,
+                    roughness: 0.92,
+                    metalness: 0.05
+                });
+
+                const floorTex = createPBRTextureSet(256, 256, (albedoCtx, roughCtx, heightData, w, h) => {
+                    const aImg = albedoCtx.createImageData(w, h);
+                    const rImg = roughCtx.createImageData(w, h);
+                    const grid = 4;
+                    const cellW = w / grid;
+
+                    for (let y = 0; y < h; y++) {
+                        for (let x = 0; x < w; x++) {
+                            const n1 = hash2D(Math.floor(x / 4), Math.floor(y / 4));
+                            const micro = hash2D(x, y);
+                            const gx = (x + (n1 - 0.5) * 5 + w) % w;
+                            const gy = (y + (n1 - 0.5) * 5 + h) % h;
+
+                            const cX = Math.floor(gx / cellW);
+                            const cY = Math.floor(gy / cellW);
+                            const inX = gx % cellW;
+                            const inY = gy % cellW;
+
+                            const border = Math.min(inX, cellW - inX, inY, cellW - inY);
+                            const slabSeed = hash2D(cX * 19, cY * 31);
+
+                            let hVal = 0.6;
+                            let r = 42, g = 40, b = 38;
+                            let rough = 210;
+
+                            if (border < 2.8) {
+                                hVal = 0.1 + micro * 0.05;
+                                r = 18; g = 19; b = 17;
+                                rough = 160;
+                            } else {
+                                const bevel = Math.min(1.0, (border - 2.8) / 5.0);
+                                hVal = 0.3 + 0.55 * bevel + (n1 - 0.5) * 0.12 + (micro - 0.5) * 0.05;
+                                const tone = 0.75 + slabSeed * 0.32 + (n1 - 0.5) * 0.14;
+                                r = Math.floor(48 * tone);
+                                g = Math.floor(46 * tone);
+                                b = Math.floor(43 * tone);
+                                rough = Math.floor(195 + (1 - slabSeed) * 45);
+                            }
+
+                            heightData[y * w + x] = hVal;
+                            const idx = (y * w + x) * 4;
+                            aImg.data[idx] = r;
+                            aImg.data[idx + 1] = g;
+                            aImg.data[idx + 2] = b;
+                            aImg.data[idx + 3] = 255;
+
+                            rImg.data[idx] = rough;
+                            rImg.data[idx + 1] = rough;
+                            rImg.data[idx + 2] = rough;
+                            rImg.data[idx + 3] = 255;
+                        }
+                    }
+                    albedoCtx.putImageData(aImg, 0, 0);
+                    roughCtx.putImageData(rImg, 0, 0);
+                }, GRID_SIZE * 1.4, GRID_SIZE * 1.4, 2.8);
+
+                const floorMat = new THREE.MeshStandardMaterial({
+                    map: floorTex.map,
+                    normalMap: floorTex.normalMap,
+                    normalScale: new THREE.Vector2(1.2, 1.2),
+                    roughnessMap: floorTex.roughnessMap,
+                    roughness: 0.88,
+                    metalness: 0.08
+                });
+
+                const ceilTex = createPBRTextureSet(128, 128, (albedoCtx, roughCtx, heightData, w, h) => {
+                    const aImg = albedoCtx.createImageData(w, h);
+                    const rImg = roughCtx.createImageData(w, h);
+                    for (let y = 0; y < h; y++) {
+                        for (let x = 0; x < w; x++) {
+                            const n = hash2D(x * 0.5, y * 0.5);
+                            heightData[y * w + x] = n;
+                            const v = Math.floor(24 + n * 16);
+                            const idx = (y * w + x) * 4;
+                            aImg.data[idx] = v;
+                            aImg.data[idx + 1] = v - 1;
+                            aImg.data[idx + 2] = v - 2;
+                            aImg.data[idx + 3] = 255;
+                            rImg.data[idx] = 240;
+                            rImg.data[idx + 1] = 240;
+                            rImg.data[idx + 2] = 240;
+                            rImg.data[idx + 3] = 255;
+                        }
+                    }
+                    albedoCtx.putImageData(aImg, 0, 0);
+                    roughCtx.putImageData(rImg, 0, 0);
+                }, GRID_SIZE * 2, GRID_SIZE * 2, 2.0);
+
+                const ceilingMat = new THREE.MeshStandardMaterial({
+                    map: ceilTex.map,
+                    normalMap: ceilTex.normalMap,
+                    roughness: 0.96,
+                    metalness: 0.02
+                });
+
+                const woodTex = createPBRTextureSet(128, 128, (albedoCtx, roughCtx, heightData, w, h) => {
+                    const aImg = albedoCtx.createImageData(w, h);
+                    const rImg = roughCtx.createImageData(w, h);
+                    for (let y = 0; y < h; y++) {
+                        for (let x = 0; x < w; x++) {
+                            const plank = x % 32;
+                            const fiber = Math.sin(y * 0.25 + hash2D(x, Math.floor(y / 8)) * 3.0) * 0.5 + 0.5;
+                            const isSeam = (plank < 2);
+                            const hVal = isSeam ? 0.1 : (0.5 + fiber * 0.35);
+                            heightData[y * w + x] = hVal;
+
+                            const shade = isSeam ? 0.25 : (0.65 + fiber * 0.35);
+                            const idx = (y * w + x) * 4;
+                            aImg.data[idx] = Math.floor(72 * shade);
+                            aImg.data[idx + 1] = Math.floor(43 * shade);
+                            aImg.data[idx + 2] = Math.floor(24 * shade);
+                            aImg.data[idx + 3] = 255;
+
+                            rImg.data[idx] = 220;
+                            rImg.data[idx + 1] = 220;
+                            rImg.data[idx + 2] = 220;
+                            rImg.data[idx + 3] = 255;
+                        }
+                    }
+                    albedoCtx.putImageData(aImg, 0, 0);
+                    roughCtx.putImageData(rImg, 0, 0);
+                }, 1, 1, 2.4);
+
+                const woodMat = new THREE.MeshStandardMaterial({
+                    map: woodTex.map,
+                    normalMap: woodTex.normalMap,
+                    roughness: 0.86,
+                    metalness: 0.05
+                });
+
+                const ironMat = new THREE.MeshStandardMaterial({
+                    color: 0x26272b,
+                    roughness: 0.45,
+                    metalness: 0.85
+                });
+
+                const pillarMat = new THREE.MeshStandardMaterial({
+                    map: wallTex.map,
+                    normalMap: wallTex.normalMap,
+                    color: 0x8c857b,
+                    roughness: 0.88,
+                    metalness: 0.08
+                });
+
+                const crackedWallMat = new THREE.MeshStandardMaterial({
+                    map: wallTex.map,
+                    normalMap: wallTex.normalMap,
+                    normalScale: new THREE.Vector2(2.1, 2.1),
+                    color: 0x9a7b56,
+                    emissive: 0x3b1806,
+                    emissiveIntensity: 0.28,
+                    roughness: 0.9,
+                    metalness: 0.05
+                });
+
+                return { wallMat, floorMat, ceilingMat, woodMat, ironMat, pillarMat, crackedWallMat };
+            }
+
+            // ============================================================================
+            // 3. THREE.JS SCENE, FIRST-PERSON PERSPECTIVE CAMERA & RENDERER
+            // ============================================================================
+            const container = document.getElementById('canvas-container');
+            const vignetteEl = document.querySelector('.vignette');
+            const scene = new THREE.Scene();
+            const FOG_COLOR = 0x050507;
+            scene.background = new THREE.Color(FOG_COLOR);
+            scene.fog = new THREE.FogExp2(FOG_COLOR, 0.082);
+
+            const camera = new THREE.PerspectiveCamera(
+                75,
+                window.innerWidth / window.innerHeight,
+                0.1,
+                42
+            );
+            camera.rotation.order = 'YXZ';
+            scene.add(camera);
+
+            const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.05;
+            container.appendChild(renderer.domElement);
+
+            const materials = buildDungeonMaterials();
+            const worldGroup = new THREE.Group();
+            scene.add(worldGroup);
+
+            // ============================================================================
+            // 3B. FIRST-PERSON 3D HANDHELD TORCH & KEY VIEWMODEL
+            // ============================================================================
+            const viewModelGroup = new THREE.Group();
+            camera.add(viewModelGroup);
+
+            const handTorchGroup = new THREE.Group();
+            handTorchGroup.position.set(0.33, -0.27, -0.48);
+            handTorchGroup.rotation.set(0.18, -0.15, -0.08);
+            viewModelGroup.add(handTorchGroup);
+
+            const torchShaft = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.026, 0.018, 0.42, 8),
+                materials.woodMat
+            );
+            handTorchGroup.add(torchShaft);
+
+            const torchCage = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.036, 0.028, 0.07, 8),
+                materials.ironMat
+            );
+            torchCage.position.y = 0.19;
+            handTorchGroup.add(torchCage);
+
+            const handFlameMat = new THREE.MeshStandardMaterial({
+                color: 0xffb733,
+                emissive: 0xff5e00,
+                emissiveIntensity: 2.8,
+                roughness: 0.2
+            });
+            const handFlameMesh = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.14, 8), handFlameMat);
+            handFlameMesh.position.y = 0.28;
+            handTorchGroup.add(handFlameMesh);
+
+            const handKeyGroup = new THREE.Group();
+            handKeyGroup.position.set(-0.32, -0.55, -0.45);
+            handKeyGroup.rotation.set(0.2, 0.5, -0.2);
+            const handKeyMat = new THREE.MeshStandardMaterial({
+                color: 0xd4a359,
+                emissive: 0x78450f,
+                emissiveIntensity: 0.45,
+                metalness: 0.88,
+                roughness: 0.25
+            });
+            const hkBow = new THREE.Mesh(new THREE.TorusGeometry(0.055, 0.012, 8, 16), handKeyMat);
+            hkBow.position.y = 0.08;
+            handKeyGroup.add(hkBow);
+            const hkShaft = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 0.15, 8), handKeyMat);
+            handKeyGroup.add(hkShaft);
+            const hkBit = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.025, 0.012), handKeyMat);
+            hkBit.position.set(0.022, -0.05, 0);
+            handKeyGroup.add(hkBit);
+            viewModelGroup.add(handKeyGroup);
+
+            // ============================================================================
+            // 4. LIGHTING SETUP
+            // ============================================================================
+            const ambientLight = new THREE.HemisphereLight(0x24222e, 0x090807, 0.32);
+            scene.add(ambientLight);
+
+            const playerTorchLight = new THREE.PointLight(0xff8c2b, 1.85, 14.5, 1.75);
+            playerTorchLight.castShadow = true;
+            playerTorchLight.shadow.mapSize.width = 512;
+            playerTorchLight.shadow.mapSize.height = 512;
+            playerTorchLight.shadow.camera.near = 0.2;
+            playerTorchLight.shadow.camera.far = 15.0;
+            playerTorchLight.shadow.bias = -0.002;
+            scene.add(playerTorchLight);
+
+            // ============================================================================
+            // 5. COORDINATE CONVERSIONS & RANDOMIZED DFS MAZE GENERATOR
+            // ============================================================================
+            function gridToWorld(row, col) {
+                const offset = (GRID_SIZE - 1) / 2;
+                return {
+                    x: (col - offset) * TILE_SIZE,
+                    z: (row - offset) * TILE_SIZE
+                };
+            }
+
+            function worldToGrid(x, z) {
+                const offset = (GRID_SIZE - 1) / 2;
+                return {
+                    col: Math.round(x / TILE_SIZE + offset),
+                    row: Math.round(z / TILE_SIZE + offset)
+                };
+            }
+
+            function generateDFSMaze(size) {
+                const grid = Array.from({ length: size }, () => Array(size).fill(1));
+                const stack = [];
+                grid[1][1] = 0;
+                stack.push({ r: 1, c: 1 });
+
+                const dirs = [
+                    { dr: -2, dc: 0 },
+                    { dr: 2, dc: 0 },
+                    { dr: 0, dc: -2 },
+                    { dr: 0, dc: 2 }
+                ];
+
+                while (stack.length > 0) {
+                    const current = stack[stack.length - 1];
+                    const shuffled = dirs.slice().sort(() => Math.random() - 0.5);
+                    let carved = false;
+
+                    for (const d of shuffled) {
+                        const nr = current.r + d.dr;
+                        const nc = current.c + d.dc;
+                        if (nr > 0 && nr < size - 1 && nc > 0 && nc < size - 1 && grid[nr][nc] === 1) {
+                            grid[current.r + d.dr / 2][current.c + d.dc / 2] = 0;
+                            grid[nr][nc] = 0;
+                            stack.push({ r: nr, c: nc });
+                            carved = true;
+                            break;
+                        }
+                    }
+
+                    if (!carved) stack.pop();
+                }
+
+                let braided = 0;
+                for (let r = 2; r < size - 2 && braided < 3; r++) {
+                    for (let c = 2; c < size - 2 && braided < 3; c++) {
+                        if (grid[r][c] === 1) {
+                            const horizOpen = grid[r][c - 1] === 0 && grid[r][c + 1] === 0;
+                            const vertOpen = grid[r - 1][c] === 0 && grid[r + 1][c] === 0;
+                            if ((horizOpen || vertOpen) && Math.random() < 0.25) {
+                                grid[r][c] = 0;
+                                braided++;
+                            }
+                        }
+                    }
+                }
+                return grid;
+            }
+
+            // ============================================================================
+            // 6. ARCHITECTURAL & COLLECTIBLE MESH BUILDERS
+            // ============================================================================
+            function createWallTorchMesh(x, z, normalX, normalZ) {
+                const torchGroup = new THREE.Group();
+                torchGroup.position.set(
+                    x + normalX * (TILE_SIZE * 0.5 + 0.12),
+                    2.15,
+                    z + normalZ * (TILE_SIZE * 0.5 + 0.12)
+                );
+
+                const bracket = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.06, 0.04, 0.36, 8),
+                    materials.ironMat
+                );
+                bracket.rotation.x = normalZ * 0.38;
+                bracket.rotation.z = -normalX * 0.38;
+                torchGroup.add(bracket);
+
+                const emberMat = new THREE.MeshStandardMaterial({
+                    color: 0xffaa33,
+                    emissive: 0xff5500,
+                    emissiveIntensity: 2.2,
+                    roughness: 0.4
+                });
+                const flameMesh = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.24, 7), emberMat);
+                flameMesh.position.set(normalX * 0.08, 0.22, normalZ * 0.08);
+                torchGroup.add(flameMesh);
+
+                const light = new THREE.PointLight(0xff7b1c, 1.35, 10.5, 1.9);
+                light.position.set(normalX * 0.22, 0.28, normalZ * 0.22);
+                torchGroup.add(light);
+
+                worldGroup.add(torchGroup);
+                torchLights.push({
+                    light,
+                    flameMesh,
+                    baseIntensity: 1.35,
+                    phase: Math.random() * Math.PI * 2
+                });
+            }
+
+            function createPedestalKey(cell, id) {
+                const pos = gridToWorld(cell.r, cell.c);
+                const root = new THREE.Group();
+                root.position.set(pos.x, 0, pos.z);
+
+                const plinthBase = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.75, 0.18, 0.75),
+                    materials.pillarMat
+                );
+                plinthBase.position.y = 0.09;
+                plinthBase.receiveShadow = true;
+                root.add(plinthBase);
+
+                const plinthColumn = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.24, 0.3, 0.78, 8),
+                    materials.pillarMat
+                );
+                plinthColumn.position.y = 0.52;
+                plinthColumn.castShadow = true;
+                plinthColumn.receiveShadow = true;
+                root.add(plinthColumn);
+
+                const plinthCap = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.62, 0.12, 0.62),
+                    materials.pillarMat
+                );
+                plinthCap.position.y = 0.95;
+                root.add(plinthCap);
+
+                const keyMeshGroup = new THREE.Group();
+                keyMeshGroup.position.y = 1.42;
+
+                const keyMat = new THREE.MeshStandardMaterial({
+                    color: 0xd4a359,
+                    emissive: 0x78450f,
+                    emissiveIntensity: 0.45,
+                    metalness: 0.88,
+                    roughness: 0.22
+                });
+
+                const bow = new THREE.Mesh(new THREE.TorusGeometry(0.14, 0.032, 10, 20), keyMat);
+                bow.position.y = 0.18;
+                keyMeshGroup.add(bow);
+
+                const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.36, 10), keyMat);
+                shaft.position.y = -0.04;
+                keyMeshGroup.add(shaft);
+
+                const teeth1 = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.045, 0.028), keyMat);
+                teeth1.position.set(0.055, -0.14, 0);
+                keyMeshGroup.add(teeth1);
+
+                const teeth2 = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.045, 0.028), keyMat);
+                teeth2.position.set(0.045, -0.20, 0);
+                keyMeshGroup.add(teeth2);
+
+                keyMeshGroup.rotation.z = 0.25;
+                root.add(keyMeshGroup);
+
+                const keyLight = new THREE.PointLight(0xd97706, 1.05, 5.2, 2.0);
+                keyLight.position.y = 1.5;
+                root.add(keyLight);
+
+                worldGroup.add(root);
+
+                return {
+                    id,
+                    root,
+                    keyMeshGroup,
+                    keyLight,
+                    x: pos.x,
+                    z: pos.z,
+                    r: cell.r,
+                    c: cell.c,
+                    collected: false
+                };
+            }
+
+            function createHeavyExitGate(row, col) {
+                const pos = gridToWorld(row, col);
+                const gateGroup = new THREE.Group();
+                gateGroup.position.set(pos.x, 0, pos.z);
+
+                const leftJamb = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.48, WALL_HEIGHT, 0.48),
+                    materials.pillarMat
+                );
+                leftJamb.position.set(-1.15, WALL_HEIGHT / 2, 0);
+                leftJamb.castShadow = true;
+                gateGroup.add(leftJamb);
+
+                const rightJamb = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.48, WALL_HEIGHT, 0.48),
+                    materials.pillarMat
+                );
+                rightJamb.position.set(1.15, WALL_HEIGHT / 2, 0);
+                rightJamb.castShadow = true;
+                gateGroup.add(rightJamb);
+
+                const lintel = new THREE.Mesh(
+                    new THREE.BoxGeometry(2.8, 0.65, 0.62),
+                    materials.pillarMat
+                );
+                lintel.position.set(0, WALL_HEIGHT - 0.35, 0);
+                gateGroup.add(lintel);
+
+                const doorPivot = new THREE.Group();
+                doorPivot.position.set(-0.92, 0, 0);
+
+                const doorLeaf = new THREE.Mesh(
+                    new THREE.BoxGeometry(1.84, 3.1, 0.22),
+                    materials.woodMat
+                );
+                doorLeaf.position.set(0.92, 1.55, 0);
+                doorLeaf.castShadow = true;
+                doorLeaf.receiveShadow = true;
+                doorPivot.add(doorLeaf);
+
+                const strapGeo = new THREE.BoxGeometry(1.86, 0.12, 0.26);
+                [0.55, 1.55, 2.55].forEach((yPos) => {
+                    const strap = new THREE.Mesh(strapGeo, materials.ironMat);
+                    strap.position.set(0.92, yPos, 0);
+                    doorPivot.add(strap);
+                });
+
+                const ringHandle = new THREE.Mesh(
+                    new THREE.TorusGeometry(0.14, 0.028, 8, 16),
+                    materials.ironMat
+                );
+                ringHandle.position.set(1.52, 1.42, 0.15);
+                doorPivot.add(ringHandle);
+
+                const ringHandleBack = ringHandle.clone();
+                ringHandleBack.position.z = -0.15;
+                doorPivot.add(ringHandleBack);
+
+                gateGroup.add(doorPivot);
+
+                const gateLanternMat = new THREE.MeshStandardMaterial({
+                    color: 0xb45309,
+                    emissive: 0x7f1d1d,
+                    emissiveIntensity: 1.4
+                });
+                const gateLantern = new THREE.Mesh(new THREE.OctahedronGeometry(0.15, 0), gateLanternMat);
+                gateLantern.position.set(0, 3.25, 0);
+                gateGroup.add(gateLantern);
+
+                const gateLight = new THREE.PointLight(0xb45309, 1.3, 7.5, 1.8);
+                gateLight.position.set(0, 2.9, 0);
+                gateGroup.add(gateLight);
+
+                worldGroup.add(gateGroup);
+
+                return {
+                    group: gateGroup,
+                    doorPivot,
+                    gateLanternMat,
+                    gateLight,
+                    x: pos.x,
+                    z: pos.z,
+                    r: row,
+                    c: col,
+                    unlocked: false,
+                    openAngle: 0
+                };
+            }
+
+            function createOilBrazier(cell) {
+                const pos = gridToWorld(cell.r, cell.c);
+                const group = new THREE.Group();
+                group.position.set(pos.x, 0, pos.z);
+
+                const bowl = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.34, 0.22, 0.36, 10),
+                    materials.ironMat
+                );
+                bowl.position.y = 0.18;
+                bowl.castShadow = true;
+                group.add(bowl);
+
+                const flameMat = new THREE.MeshStandardMaterial({
+                    color: 0xffaa22,
+                    emissive: 0xff5500,
+                    emissiveIntensity: 2.5,
+                    roughness: 0.3
+                });
+                const flame = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.38, 8), flameMat);
+                flame.position.y = 0.48;
+                group.add(flame);
+
+                const light = new THREE.PointLight(0xff7711, 1.15, 6.0, 2.0);
+                light.position.y = 0.65;
+                group.add(light);
+
+                worldGroup.add(group);
+                return {
+                    group,
+                    flame,
+                    light,
+                    x: pos.x,
+                    z: pos.z,
+                    r: cell.r,
+                    c: cell.c,
+                    used: false
+                };
+            }
+
+            function createSpikeTrap(cell) {
+                const pos = gridToWorld(cell.r, cell.c);
+                const group = new THREE.Group();
+                group.position.set(pos.x, 0.01, pos.z);
+
+                const plate = new THREE.Mesh(
+                    new THREE.BoxGeometry(1.45, 0.04, 1.45),
+                    materials.ironMat
+                );
+                plate.receiveShadow = true;
+                group.add(plate);
+
+                const spikesGroup = new THREE.Group();
+                spikesGroup.position.y = -0.32;
+                const spikeGeo = new THREE.ConeGeometry(0.055, 0.42, 6);
+                for (let sx = -0.42; sx <= 0.42; sx += 0.42) {
+                    for (let sz = -0.42; sz <= 0.42; sz += 0.42) {
+                        const sp = new THREE.Mesh(spikeGeo, materials.ironMat);
+                        sp.position.set(sx, 0.21, sz);
+                        spikesGroup.add(sp);
+                    }
+                }
+                group.add(spikesGroup);
+                worldGroup.add(group);
+
+                return {
+                    group,
+                    spikesGroup,
+                    x: pos.x,
+                    z: pos.z,
+                    r: cell.r,
+                    c: cell.c,
+                    cooldown: 0,
+                    spikeHeight: -0.32
+                };
+            }
+
+            function dropChalkMarker() {
+                if (currentState !== STATE.PLAYING) return;
+                if (player.embersLeft <= 0) {
+                    showToast('No Chalk Stones Remaining');
+                    return;
+                }
+                player.embersLeft--;
+                sfx.playEmberDrop();
+
+                const markerMat = new THREE.MeshStandardMaterial({
+                    color: 0xd6cbb9,
+                    emissive: 0x8a795d,
+                    emissiveIntensity: 0.9,
+                    roughness: 0.7
+                });
+                const mesh = new THREE.Mesh(new THREE.OctahedronGeometry(0.08, 0), markerMat);
+                mesh.position.set(player.x, 0.06, player.z);
+                mesh.rotation.y = Math.random() * Math.PI;
+                worldGroup.add(mesh);
+
+                emberCrumbs.push({ mesh, x: player.x, z: player.z });
+                updateHUD();
+                showToast(`Floor Marked (${player.embersLeft} Left)`);
+            }
+
+            function tryStrikeWall() {
+                if (currentState !== STATE.PLAYING) return;
+                player.bashAnimTimer = 0.28;
+
+                const forwardX = -Math.sin(player.yaw);
+                const forwardZ = -Math.cos(player.yaw);
+
+                for (let i = 0; i < breakableWalls.length; i++) {
+                    const bw = breakableWalls[i];
+                    if (bw.broken) continue;
+                    const dx = bw.x - player.x;
+                    const dz = bw.z - player.z;
+                    const dist = Math.hypot(dx, dz);
+                    if (dist < 2.95) {
+                        const dot = (dx * forwardX + dz * forwardZ) / (dist || 1);
+                        if (dot > 0.45) {
+                            bw.broken = true;
+                            bw.box.disabled = true;
+                            mazeGrid[bw.r][bw.c] = 0;
+                            exploredGrid[bw.r][bw.c] = true;
+                            worldGroup.remove(bw.mesh);
+                            sfx.playWallBash();
+                            showToast('Fractured Masonry Shattered');
+                            return;
+                        }
+                    }
+                }
+            }
+
+            function createDustParticles() {
+                const count = 220;
+                const geo = new THREE.BufferGeometry();
+                const positions = new Float32Array(count * 3);
+                const span = GRID_SIZE * TILE_SIZE;
+
+                for (let i = 0; i < count; i++) {
+                    positions[i * 3] = (Math.random() - 0.5) * span;
+                    positions[i * 3 + 1] = 0.3 + Math.random() * (WALL_HEIGHT - 0.6);
+                    positions[i * 3 + 2] = (Math.random() - 0.5) * span;
+                }
+                geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+                const mat = new THREE.PointsMaterial({
+                    color: 0xc2b299,
+                    size: 0.045,
+                    transparent: true,
+                    opacity: 0.38,
+                    depthWrite: false
+                });
+
+                dustSystem = new THREE.Points(geo, mat);
+                worldGroup.add(dustSystem);
+            }
+
+            // ============================================================================
+            // 7. WORLD BUILDER & ENTITY SPAWNING
+            // ============================================================================
+            function clearWorld() {
+                while (worldGroup.children.length > 0) {
+                    const obj = worldGroup.children[0];
+                    worldGroup.remove(obj);
+                }
+                wallBoxes = [];
+                breakableWalls = [];
+                keyObjects = [];
+                oilPots = [];
+                spikeTraps = [];
+                emberCrumbs = [];
+                torchLights = [];
+                exitGate = null;
+                dustSystem = null;
+            }
+
+            function buildLabyrinthWorld() {
+                clearWorld();
+                applyLevelParameters(currentLevel);
+
+                // Increase fog density slightly on deeper levels for heightened claustrophobia
+                scene.fog.density = Math.min(0.118, 0.082 + (currentLevel - 1) * 0.006);
+
+                // Update floor & ceiling texture tiling to match current GRID_SIZE so stones never stretch
+                if (materials.floorMat && materials.floorMat.map) {
+                    const fRep = GRID_SIZE * 1.4;
+                    materials.floorMat.map.repeat.set(fRep, fRep);
+                    materials.floorMat.normalMap.repeat.set(fRep, fRep);
+                    materials.floorMat.roughnessMap.repeat.set(fRep, fRep);
+                }
+                if (materials.ceilingMat && materials.ceilingMat.map) {
+                    const cRep = GRID_SIZE * 2;
+                    materials.ceilingMat.map.repeat.set(cRep, cRep);
+                    materials.ceilingMat.normalMap.repeat.set(cRep, cRep);
+                }
+
+                mazeGrid = generateDFSMaze(GRID_SIZE);
+                exploredGrid = Array.from({ length: GRID_SIZE }, () => Array(GRID_SIZE).fill(false));
+
+                const totalSpan = GRID_SIZE * TILE_SIZE;
+
+                const floorMesh = new THREE.Mesh(
+                    new THREE.PlaneGeometry(totalSpan, totalSpan),
+                    materials.floorMat
+                );
+                floorMesh.rotation.x = -Math.PI / 2;
+                floorMesh.receiveShadow = true;
+                worldGroup.add(floorMesh);
+
+                const ceilingMesh = new THREE.Mesh(
+                    new THREE.PlaneGeometry(totalSpan, totalSpan),
+                    materials.ceilingMat
+                );
+                ceilingMesh.rotation.x = Math.PI / 2;
+                ceilingMesh.position.y = WALL_HEIGHT;
+                worldGroup.add(ceilingMesh);
+
+                const wallGeo = new THREE.BoxGeometry(TILE_SIZE, WALL_HEIGHT, TILE_SIZE);
+                const plinthGeo = new THREE.BoxGeometry(TILE_SIZE + 0.14, 0.26, TILE_SIZE + 0.14);
+                const corniceGeo = new THREE.BoxGeometry(TILE_SIZE + 0.16, 0.28, TILE_SIZE + 0.16);
+
+                const candidateShortcuts = [];
+                for (let r = 2; r < GRID_SIZE - 2; r++) {
+                    for (let c = 2; c < GRID_SIZE - 2; c++) {
+                        if (mazeGrid[r][c] === 1) {
+                            const nsOpen = mazeGrid[r - 1][c] === 0 && mazeGrid[r + 1][c] === 0;
+                            const ewOpen = mazeGrid[r][c - 1] === 0 && mazeGrid[r][c + 1] === 0;
+                            if (nsOpen !== ewOpen) {
+                                candidateShortcuts.push({ r, c });
+                            }
+                        }
+                    }
+                }
+                candidateShortcuts.sort(() => Math.random() - 0.5);
+                const shortcutSet = new Set(
+                    candidateShortcuts.slice(0, 2).map((s) => `${s.r},${s.c}`)
+                );
+
+                for (let r = 0; r < GRID_SIZE; r++) {
+                    for (let c = 0; c < GRID_SIZE; c++) {
+                        if (mazeGrid[r][c] === 1) {
+                            const pos = gridToWorld(r, c);
+                            const isBreakable = shortcutSet.has(`${r},${c}`);
+
+                            const wallMesh = new THREE.Mesh(
+                                wallGeo,
+                                isBreakable ? materials.crackedWallMat : materials.wallMat
+                            );
+                            wallMesh.position.set(pos.x, WALL_HEIGHT / 2, pos.z);
+                            wallMesh.castShadow = true;
+                            wallMesh.receiveShadow = true;
+                            worldGroup.add(wallMesh);
+
+                            if (!isBreakable) {
+                                const baseTrim = new THREE.Mesh(plinthGeo, materials.pillarMat);
+                                baseTrim.position.set(pos.x, 0.13, pos.z);
+                                baseTrim.receiveShadow = true;
+                                worldGroup.add(baseTrim);
+
+                                const topTrim = new THREE.Mesh(corniceGeo, materials.pillarMat);
+                                topTrim.position.set(pos.x, WALL_HEIGHT - 0.14, pos.z);
+                                worldGroup.add(topTrim);
+                            }
+
+                            const half = TILE_SIZE / 2;
+                            const boxRecord = {
+                                minX: pos.x - half,
+                                maxX: pos.x + half,
+                                minZ: pos.z - half,
+                                maxZ: pos.z + half,
+                                disabled: false
+                            };
+                            wallBoxes.push(boxRecord);
+
+                            if (isBreakable) {
+                                breakableWalls.push({
+                                    r,
+                                    c,
+                                    x: pos.x,
+                                    z: pos.z,
+                                    mesh: wallMesh,
+                                    box: boxRecord,
+                                    broken: false
+                                });
+                            }
+                        }
+                    }
+                }
+
+                let torchesPlaced = 0;
+                for (let r = 1; r < GRID_SIZE - 1 && torchesPlaced < 10; r += 2) {
+                    for (let c = 1; c < GRID_SIZE - 1 && torchesPlaced < 10; c += 2) {
+                        if (mazeGrid[r][c] === 1) {
+                            const pos = gridToWorld(r, c);
+                            if (mazeGrid[r + 1] && mazeGrid[r + 1][c] === 0 && Math.random() < 0.45) {
+                                createWallTorchMesh(pos.x, pos.z, 0, 1);
+                                torchesPlaced++;
+                            } else if (mazeGrid[r][c + 1] === 0 && Math.random() < 0.45) {
+                                createWallTorchMesh(pos.x, pos.z, 1, 0);
+                                torchesPlaced++;
+                            }
+                        }
+                    }
+                }
+
+                const startCell = { r: 1, c: 1 };
+                const exitCell = { r: GRID_SIZE - 2, c: GRID_SIZE - 2 };
+                const openCells = [];
+                const deadEnds = [];
+
+                for (let r = 1; r < GRID_SIZE - 1; r++) {
+                    for (let c = 1; c < GRID_SIZE - 1; c++) {
+                        if (mazeGrid[r][c] === 0) {
+                            const isStart = (r === startCell.r && c === startCell.c);
+                            const isExit = (r === exitCell.r && c === exitCell.c);
+                            if (!isStart && !isExit) {
+                                openCells.push({ r, c });
+                                let neighbors = 0;
+                                if (mazeGrid[r - 1][c] === 0) neighbors++;
+                                if (mazeGrid[r + 1][c] === 0) neighbors++;
+                                if (mazeGrid[r][c - 1] === 0) neighbors++;
+                                if (mazeGrid[r][c + 1] === 0) neighbors++;
+                                if (neighbors === 1) deadEnds.push({ r, c });
+                            }
+                        }
+                    }
+                }
+
+                openCells.sort((a, b) => {
+                    const da = Math.abs(a.r - 1) + Math.abs(a.c - 1);
+                    const db = Math.abs(b.r - 1) + Math.abs(b.c - 1);
+                    return db - da;
+                });
+
+                const usedSet = new Set();
+                const selectedKeyCells = [];
+
+                // Spread TOTAL_KEYS across the maze with minimum Manhattan distance between them
+                for (let i = 0; i < openCells.length && selectedKeyCells.length < TOTAL_KEYS; i++) {
+                    const candidate = openCells[i];
+                    const farEnough = selectedKeyCells.every(
+                        (kc) => Math.abs(kc.r - candidate.r) + Math.abs(kc.c - candidate.c) >= 5
+                    );
+                    if (farEnough) {
+                        selectedKeyCells.push(candidate);
+                        usedSet.add(`${candidate.r},${candidate.c}`);
+                    }
+                }
+                // Fallback if maze is tight
+                for (let i = 0; i < openCells.length && selectedKeyCells.length < TOTAL_KEYS; i++) {
+                    const candidate = openCells[i];
+                    const keyStr = `${candidate.r},${candidate.c}`;
+                    if (!usedSet.has(keyStr)) {
+                        selectedKeyCells.push(candidate);
+                        usedSet.add(keyStr);
+                    }
+                }
+
+                selectedKeyCells.forEach((cell, idx) => {
+                    keyObjects.push(createPedestalKey(cell, idx + 1));
+                });
+
+                deadEnds.forEach((de) => {
+                    const key = `${de.r},${de.c}`;
+                    if (!usedSet.has(key) && oilPots.length < NUM_OIL_POTS) {
+                        usedSet.add(key);
+                        oilPots.push(createOilBrazier(de));
+                    }
+                });
+
+                openCells.slice().sort(() => Math.random() - 0.5).forEach((cell) => {
+                    const key = `${cell.r},${cell.c}`;
+                    if (!usedSet.has(key) && spikeTraps.length < NUM_TRAPS) {
+                        usedSet.add(key);
+                        spikeTraps.push(createSpikeTrap(cell));
+                    }
+                });
+
+                exitGate = createHeavyExitGate(exitCell.r, exitCell.c);
+
+                const startPos = gridToWorld(startCell.r, startCell.c);
+                player.x = startPos.x;
+                player.z = startPos.z;
+                player.y = EYE_HEIGHT;
+                player.pitch = 0;
+
+                if (mazeGrid[1][2] === 0) {
+                    player.yaw = -Math.PI / 2;
+                } else {
+                    player.yaw = Math.PI;
+                }
+
+                camera.position.set(player.x, player.y, player.z);
+                camera.rotation.set(player.pitch, player.yaw, 0);
+
+                createDustParticles();
+                markExploredAroundPlayer();
+            }
+
+            // ============================================================================
+            // 8. AXIS-SEPARATED CIRCLE-VS-AABB COLLISION DETECTION
+            // ============================================================================
+            function checkCircleWallCollision(px, pz, radius) {
+                for (let i = 0; i < wallBoxes.length; i++) {
+                    const b = wallBoxes[i];
+                    if (b.disabled) continue;
+                    const closestX = Math.max(b.minX, Math.min(px, b.maxX));
+                    const closestZ = Math.max(b.minZ, Math.min(pz, b.maxZ));
+                    const dx = px - closestX;
+                    const dz = pz - closestZ;
+                    if (dx * dx + dz * dz < radius * radius) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            function markExploredAroundPlayer() {
+                const g = worldToGrid(player.x, player.z);
+                for (let dr = -1; dr <= 1; dr++) {
+                    for (let dc = -1; dc <= 1; dc++) {
+                        const nr = g.row + dr;
+                        const nc = g.col + dc;
+                        if (nr >= 0 && nr < GRID_SIZE && nc >= 0 && nc < GRID_SIZE) {
+                            exploredGrid[nr][nc] = true;
+                        }
+                    }
+                }
+            }
+
+            // ============================================================================
+            // 9. HUD, COMPASS & FOG-OF-WAR MINIMAP RENDERERS
+            // ============================================================================
+            const hudTimerEl = document.getElementById('hud-timer');
+            const hudTorchBarEl = document.getElementById('hud-torch-bar');
+            const hudStaminaBarEl = document.getElementById('hud-stamina-bar');
+            const hudEmbersEl = document.getElementById('hud-embers');
+            const hudLevelEl = document.getElementById('hud-level');
+            const hudKeysContainerEl = document.getElementById('hud-keys-container');
+            const portalStatusTextEl = document.getElementById('portal-status-text');
+            const toastMessageEl = document.getElementById('toast-message');
+            const proximityPromptEl = document.getElementById('proximity-prompt');
+            const minimapCanvas = document.getElementById('minimap-canvas');
+            const minimapCtx = minimapCanvas.getContext('2d');
+            const minimapExploredEl = document.getElementById('minimap-explored');
+            const compassCanvas = document.getElementById('compass-canvas');
+            const compassCtx = compassCanvas.getContext('2d');
+
+            let toastTimeout = null;
+            function showToast(text) {
+                toastMessageEl.textContent = text;
+                toastMessageEl.classList.remove('opacity-0', '-translate-y-1');
+                toastMessageEl.classList.add('opacity-100', 'translate-y-0');
+                if (toastTimeout) clearTimeout(toastTimeout);
+                toastTimeout = setTimeout(() => {
+                    toastMessageEl.classList.remove('opacity-100', 'translate-y-0');
+                    toastMessageEl.classList.add('opacity-0', '-translate-y-1');
+                }, 2400);
+            }
+
+            function updateHUD() {
+                const secs = Math.max(0, Math.ceil(timeRemaining));
+                hudTimerEl.textContent = `${secs}s`;
+                const pct = Math.max(0, Math.min(100, (timeRemaining / ROUND_TIME_SEC) * 100));
+                hudTorchBarEl.style.width = `${pct}%`;
+
+                hudStaminaBarEl.style.width = `${Math.max(0, Math.min(100, player.stamina))}%`;
+                hudEmbersEl.textContent = String(player.embersLeft);
+                if (hudLevelEl) hudLevelEl.textContent = toRoman(currentLevel);
+
+                // Dynamically render diamond icons for the current level's TOTAL_KEYS
+                if (hudKeysContainerEl) {
+                    if (hudKeysContainerEl.children.length !== TOTAL_KEYS) {
+                        hudKeysContainerEl.innerHTML = '';
+                        for (let i = 0; i < TOTAL_KEYS; i++) {
+                            const span = document.createElement('span');
+                            hudKeysContainerEl.appendChild(span);
+                        }
+                    }
+                    for (let i = 0; i < TOTAL_KEYS; i++) {
+                        const icon = hudKeysContainerEl.children[i];
+                        if (i < keysCollected) {
+                            icon.className = 'w-2.5 h-2.5 rotate-45 border border-[#e0cda9] bg-[#d4a359] inline-block transition-all duration-300 shadow-[0_0_6px_#d4a359]';
+                        } else {
+                            icon.className = 'w-2.5 h-2.5 rotate-45 border border-[#786242] bg-black/70 inline-block transition-all duration-300';
+                        }
+                    }
+                }
+
+                if (keysCollected >= TOTAL_KEYS) {
+                    portalStatusTextEl.textContent = 'The oak gate is unbarred.';
+                    portalStatusTextEl.className = 'hidden sm:block text-[11px] italic text-[#d8b880] tracking-wider drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]';
+                } else {
+                    portalStatusTextEl.textContent = `Barred (${keysCollected}/${TOTAL_KEYS} Keys) · ${GRID_SIZE}×${GRID_SIZE} Vault`;
+                    portalStatusTextEl.className = 'hidden sm:block text-[11px] italic text-[#9e8c74] tracking-wider drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]';
+                }
+            }
+
+            function renderMinimap() {
+                const w = minimapCanvas.width;
+                const h = minimapCanvas.height;
+                const cellPx = w / GRID_SIZE;
+
+                minimapCtx.fillStyle = '#0e0b08';
+                minimapCtx.fillRect(0, 0, w, h);
+
+                let exploredCount = 0;
+                const totalCells = GRID_SIZE * GRID_SIZE;
+
+                for (let r = 0; r < GRID_SIZE; r++) {
+                    for (let c = 0; c < GRID_SIZE; c++) {
+                        if (!exploredGrid[r][c]) continue;
+                        exploredCount++;
+
+                        if (mazeGrid[r][c] === 1) {
+                            minimapCtx.fillStyle = '#261f18';
+                        } else {
+                            minimapCtx.fillStyle = '#473a2b';
+                        }
+                        minimapCtx.fillRect(c * cellPx, r * cellPx, cellPx - 0.5, cellPx - 0.5);
+                    }
+                }
+
+                minimapExploredEl.textContent = `${Math.round((exploredCount / totalCells) * 100)}%`;
+
+                minimapCtx.fillStyle = '#d6cbb9';
+                emberCrumbs.forEach((crumb) => {
+                    const g = worldToGrid(crumb.x, crumb.z);
+                    minimapCtx.fillRect(g.col * cellPx + cellPx * 0.35, g.row * cellPx + cellPx * 0.35, 2.5, 2.5);
+                });
+
+                keyObjects.forEach((k) => {
+                    if (!k.collected && exploredGrid[k.r][k.c]) {
+                        minimapCtx.fillStyle = '#e0b15e';
+                        minimapCtx.fillRect(k.c * cellPx + 2.5, k.r * cellPx + 2.5, cellPx - 5, cellPx - 5);
+                    }
+                });
+
+                if (exitGate && exploredGrid[exitGate.r][exitGate.c]) {
+                    minimapCtx.fillStyle = exitGate.unlocked ? '#84a97c' : '#a84a3b';
+                    minimapCtx.fillRect(exitGate.c * cellPx + 2, exitGate.r * cellPx + 2, cellPx - 4, cellPx - 4);
+                }
+
+                const pg = worldToGrid(player.x, player.z);
+                const px = (pg.col + 0.5) * cellPx;
+                const py = (pg.row + 0.5) * cellPx;
+
+                minimapCtx.strokeStyle = '#e5dccb';
+                minimapCtx.lineWidth = 1.2;
+                minimapCtx.beginPath();
+                minimapCtx.moveTo(px, py);
+                minimapCtx.lineTo(
+                    px - Math.sin(player.yaw) * 6.5,
+                    py - Math.cos(player.yaw) * 6.5
+                );
+                minimapCtx.stroke();
+
+                minimapCtx.fillStyle = '#ffffff';
+                minimapCtx.beginPath();
+                minimapCtx.arc(px, py, 2.2, 0, Math.PI * 2);
+                minimapCtx.fill();
+            }
+
+            function renderCompass() {
+                const w = compassCanvas.width;
+                const h = compassCanvas.height;
+                compassCtx.clearRect(0, 0, w, h);
+
+                const dirs = [
+                    { label: 'N', angle: 0 },
+                    { label: 'E', angle: -Math.PI / 2 },
+                    { label: 'S', angle: Math.PI },
+                    { label: 'W', angle: Math.PI / 2 }
+                ];
+
+                const fovSpan = Math.PI * 0.75;
+                compassCtx.font = '10px Cinzel, serif';
+                compassCtx.textAlign = 'center';
+
+                dirs.forEach((d) => {
+                    let diff = d.angle - player.yaw;
+                    diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+                    if (Math.abs(diff) < fovSpan) {
+                        const x = w / 2 - (diff / fovSpan) * (w / 2);
+                        compassCtx.fillStyle = '#9e8c74';
+                        compassCtx.fillText(d.label, x, 14);
+                    }
+                });
+
+                const plotMarker = (tx, tz, color) => {
+                    const dx = tx - player.x;
+                    const dz = tz - player.z;
+                    const targetYaw = Math.atan2(-dx, -dz);
+                    let diff = targetYaw - player.yaw;
+                    diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+                    if (Math.abs(diff) < fovSpan) {
+                        const x = w / 2 - (diff / fovSpan) * (w / 2);
+                        compassCtx.fillStyle = color;
+                        compassCtx.beginPath();
+                        compassCtx.moveTo(x, 17);
+                        compassCtx.lineTo(x - 3, 21);
+                        compassCtx.lineTo(x + 3, 21);
+                        compassCtx.closePath();
+                        compassCtx.fill();
+                    }
+                };
+
+                keyObjects.forEach((k) => {
+                    if (!k.collected) plotMarker(k.x, k.z, '#e0b15e');
+                });
+
+                if (exitGate) {
+                    plotMarker(exitGate.x, exitGate.z, exitGate.unlocked ? '#84a97c' : '#a84a3b');
+                }
+            }
+
+            // ============================================================================
+            // 10. OVERLAY MODALS, POINTER LOCK & MOBILE LANDSCAPE LOCK
+            // ============================================================================
+            const overlayScreenEl = document.getElementById('overlay-screen');
+            const modalBadgeEl = document.getElementById('modal-badge');
+            const modalTitleEl = document.getElementById('modal-title');
+            const modalDescEl = document.getElementById('modal-desc');
+            const btnPrimaryAction = document.getElementById('btn-primary-action');
+            const btnSecondaryRestart = document.getElementById('btn-secondary-restart');
+
+            function showOverlayModal(badge, title, desc, primaryLabel, showSecondary) {
+                modalBadgeEl.textContent = badge;
+                modalTitleEl.textContent = title;
+                modalDescEl.textContent = desc;
+                btnPrimaryAction.textContent = primaryLabel;
+                if (showSecondary) {
+                    btnSecondaryRestart.classList.remove('hidden');
+                } else {
+                    btnSecondaryRestart.classList.add('hidden');
+                }
+                overlayScreenEl.classList.remove('opacity-0', 'pointer-events-none');
+            }
+
+            function hideOverlayModal() {
+                overlayScreenEl.classList.add('opacity-0', 'pointer-events-none');
+            }
+
+            function tryLockLandscapeMobile() {
+                if (!isTouchDevice) return;
+                const docEl = document.documentElement;
+                if (docEl.requestFullscreen && !document.fullscreenElement) {
+                    docEl.requestFullscreen().then(() => {
+                        if (screen.orientation && screen.orientation.lock) {
+                            screen.orientation.lock('landscape').catch(() => {});
+                        }
+                    }).catch(() => {});
+                } else if (screen.orientation && screen.orientation.lock) {
+                    screen.orientation.lock('landscape').catch(() => {});
+                }
+            }
+
+            function requestGamePointerLock() {
+                sfx.init();
+                if (isTouchDevice) {
+                    tryLockLandscapeMobile();
+                    return;
+                }
+                if (renderer.domElement.requestPointerLock) {
+                    renderer.domElement.requestPointerLock();
+                }
+            }
+
+            document.addEventListener('pointerlockchange', () => {
+                isPointerLocked = (document.pointerLockElement === renderer.domElement);
+                if (!isPointerLocked && !isTouchDevice && currentState === STATE.PLAYING) {
+                    if (suppressNextUnlockPause) {
+                        suppressNextUnlockPause = false;
+                        return;
+                    }
+                    currentState = STATE.PAUSED;
+                    showOverlayModal(
+                        `Depth ${toRoman(currentLevel)} — Exploration Paused`,
+                        'The Last Corridor',
+                        'Your torch burns steady while you gather your bearings in the dark.',
+                        'Resume',
+                        true
+                    );
+                }
+            });
+
+            function startRun(targetLevel) {
+                if (typeof targetLevel === 'number') {
+                    currentLevel = Math.max(1, targetLevel);
+                }
+                applyLevelParameters(currentLevel);
+                keysCollected = 0;
+                timeRemaining = ROUND_TIME_SEC;
+                player.stamina = 100;
+                player.embersLeft = MAX_EMBERS;
+                player.keyAnimTimer = 0;
+                player.bashAnimTimer = 0;
+                input.joyX = 0;
+                input.joyY = 0;
+                buildLabyrinthWorld();
+                updateHUD();
+                renderMinimap();
+                renderCompass();
+                currentState = STATE.PLAYING;
+                hideOverlayModal();
+                requestGamePointerLock();
+
+                const levelTitle = LEVEL_TITLES[Math.min(currentLevel - 1, LEVEL_TITLES.length - 1)];
+                showToast(`Depth ${toRoman(currentLevel)}: ${levelTitle}`);
+            }
+
+            btnPrimaryAction.addEventListener('click', () => {
+                if (currentState === STATE.START) {
+                    startRun(1);
+                } else if (currentState === STATE.WON) {
+                    // Advance to the next deeper, harder level!
+                    startRun(currentLevel + 1);
+                } else if (currentState === STATE.LOST) {
+                    // Retry the current level
+                    startRun(currentLevel);
+                } else if (currentState === STATE.PAUSED) {
+                    currentState = STATE.PLAYING;
+                    hideOverlayModal();
+                    requestGamePointerLock();
+                }
+            });
+
+            btnSecondaryRestart.addEventListener('click', () => {
+                // Reset back to Depth I
+                startRun(1);
+            });
+
+            document.getElementById('btn-regenerate').addEventListener('click', () => {
+                startRun(currentLevel);
+            });
+
+            document.getElementById('btn-fullscreen').addEventListener('click', () => {
+                const docEl = document.documentElement;
+                if (!document.fullscreenElement && docEl.requestFullscreen) {
+                    docEl.requestFullscreen().then(() => {
+                        if (screen.orientation && screen.orientation.lock) {
+                            screen.orientation.lock('landscape').catch(() => {});
+                        }
+                    }).catch(() => {});
+                } else if (document.exitFullscreen && document.fullscreenElement) {
+                    document.exitFullscreen().catch(() => {});
+                }
+            });
+
+            const btnMute = document.getElementById('btn-mute');
+            btnMute.addEventListener('click', () => {
+                sfx.init();
+                sfx.muted = !sfx.muted;
+                btnMute.textContent = sfx.muted ? 'Audio: Off' : 'Audio: On';
+            });
+
+            const vivaDrawer = document.getElementById('viva-drawer');
+            document.getElementById('btn-viva').addEventListener('click', () => {
+                if (document.pointerLockElement) {
+                    suppressNextUnlockPause = true;
+                    document.exitPointerLock();
+                }
+                vivaDrawer.classList.remove('translate-x-full');
+            });
+            document.getElementById('btn-close-viva').addEventListener('click', () => {
+                vivaDrawer.classList.add('translate-x-full');
+            });
+
+            // ============================================================================
+            // 11. DESKTOP KEYBOARD/MOUSE & MOBILE TWIN-STICK MULTI-TOUCH HANDLERS
+            // ============================================================================
+            window.addEventListener('mousemove', (e) => {
+                if (!isPointerLocked || currentState !== STATE.PLAYING) return;
+                player.yaw -= e.movementX * MOUSE_SENSITIVITY;
+                player.pitch -= e.movementY * MOUSE_SENSITIVITY;
+                const maxPitch = (80 * Math.PI) / 180;
+                player.pitch = Math.max(-maxPitch, Math.min(maxPitch, player.pitch));
+            });
+
+            window.addEventListener('mousedown', (e) => {
+                if (currentState === STATE.PLAYING && isPointerLocked && e.button === 0) {
+                    tryStrikeWall();
+                }
+            });
+
+            window.addEventListener('keydown', (e) => {
+                switch (e.code) {
+                    case 'KeyW':
+                    case 'ArrowUp':
+                        input.forward = true;
+                        break;
+                    case 'KeyS':
+                    case 'ArrowDown':
+                        input.backward = true;
+                        break;
+                    case 'KeyA':
+                        input.left = true;
+                        break;
+                    case 'KeyD':
+                        input.right = true;
+                        break;
+                    case 'ArrowLeft':
+                        input.turnLeft = true;
+                        break;
+                    case 'ArrowRight':
+                        input.turnRight = true;
+                        break;
+                    case 'ShiftLeft':
+                    case 'ShiftRight':
+                        input.sprint = true;
+                        break;
+                    case 'KeyF':
+                    case 'Space':
+                        e.preventDefault();
+                        dropChalkMarker();
+                        break;
+                    case 'KeyE':
+                        tryStrikeWall();
+                        break;
+                }
+            });
+
+            window.addEventListener('keyup', (e) => {
+                switch (e.code) {
+                    case 'KeyW':
+                    case 'ArrowUp':
+                        input.forward = false;
+                        break;
+                    case 'KeyS':
+                    case 'ArrowDown':
+                        input.backward = false;
+                        break;
+                    case 'KeyA':
+                        input.left = false;
+                        break;
+                    case 'KeyD':
+                        input.right = false;
+                        break;
+                    case 'ArrowLeft':
+                        input.turnLeft = false;
+                        break;
+                    case 'ArrowRight':
+                        input.turnRight = false;
+                        break;
+                    case 'ShiftLeft':
+                    case 'ShiftRight':
+                        input.sprint = false;
+                        break;
+                }
+            });
+
+            // ----------------------------------------------------------------------------
+            // MOBILE LEFT THUMB ANALOG VIRTUAL JOYSTICK
+            // ----------------------------------------------------------------------------
+            const joystickZone = document.getElementById('joystick-zone');
+            const joystickKnob = document.getElementById('joystick-knob');
+            let joyTouchId = null;
+
+            function updateJoystickFromTouch(touch) {
+                const rect = joystickZone.getBoundingClientRect();
+                const centerX = rect.left + rect.width / 2;
+                const centerY = rect.top + rect.height / 2;
+                const maxRadius = rect.width * 0.38;
+
+                let dx = touch.clientX - centerX;
+                let dy = touch.clientY - centerY;
+                const dist = Math.hypot(dx, dy);
+
+                if (dist > maxRadius) {
+                    dx = (dx / dist) * maxRadius;
+                    dy = (dy / dist) * maxRadius;
+                }
+
+                joystickKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+                input.joyX = dx / maxRadius;
+                input.joyY = -dy / maxRadius; // Up is positive forward
+            }
+
+            function resetJoystick() {
+                joyTouchId = null;
+                joystickKnob.style.transform = 'translate(0px, 0px)';
+                input.joyX = 0;
+                input.joyY = 0;
+            }
+
+            joystickZone.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                sfx.init();
+                if (joyTouchId === null && e.changedTouches.length > 0) {
+                    const t = e.changedTouches[0];
+                    joyTouchId = t.identifier;
+                    updateJoystickFromTouch(t);
+                }
+            }, { passive: false });
+
+            joystickZone.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    if (e.changedTouches[i].identifier === joyTouchId) {
+                        updateJoystickFromTouch(e.changedTouches[i]);
+                        break;
+                    }
+                }
+            }, { passive: false });
+
+            joystickZone.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    if (e.changedTouches[i].identifier === joyTouchId) {
+                        resetJoystick();
+                        break;
+                    }
+                }
+            }, { passive: false });
+
+            joystickZone.addEventListener('touchcancel', resetJoystick, { passive: false });
+
+            // ----------------------------------------------------------------------------
+            // MOBILE RIGHT-SIDE FREE-LOOK TOUCH SWIPE ZONE (360° Smooth Camera Look)
+            // ----------------------------------------------------------------------------
+            const lookTouchZone = document.getElementById('look-touch-zone');
+            let lookTouchId = null;
+            let lastLookX = 0;
+            let lastLookY = 0;
+            let lookTapStartTime = 0;
+            let lookTotalDrag = 0;
+
+            lookTouchZone.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                sfx.init();
+                if (lookTouchId === null && e.changedTouches.length > 0) {
+                    const t = e.changedTouches[0];
+                    lookTouchId = t.identifier;
+                    lastLookX = t.clientX;
+                    lastLookY = t.clientY;
+                    lookTapStartTime = performance.now();
+                    lookTotalDrag = 0;
+                }
+            }, { passive: false });
+
+            lookTouchZone.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                if (currentState !== STATE.PLAYING) return;
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    const t = e.changedTouches[i];
+                    if (t.identifier === lookTouchId) {
+                        const dx = t.clientX - lastLookX;
+                        const dy = t.clientY - lastLookY;
+                        lastLookX = t.clientX;
+                        lastLookY = t.clientY;
+                        lookTotalDrag += Math.hypot(dx, dy);
+
+                        player.yaw -= dx * TOUCH_LOOK_SENSITIVITY;
+                        player.pitch -= dy * TOUCH_LOOK_SENSITIVITY;
+                        const maxPitch = (80 * Math.PI) / 180;
+                        player.pitch = Math.max(-maxPitch, Math.min(maxPitch, player.pitch));
+                        break;
+                    }
+                }
+            }, { passive: false });
+
+            function endLookTouch(e) {
+                e.preventDefault();
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    if (e.changedTouches[i].identifier === lookTouchId) {
+                        // Quick tap on the right screen also strikes cracked walls!
+                        if (performance.now() - lookTapStartTime < 220 && lookTotalDrag < 14) {
+                            tryStrikeWall();
+                        }
+                        lookTouchId = null;
+                        break;
+                    }
+                }
+            }
+
+            lookTouchZone.addEventListener('touchend', endLookTouch, { passive: false });
+            lookTouchZone.addEventListener('touchcancel', endLookTouch, { passive: false });
+
+            // ----------------------------------------------------------------------------
+            // MOBILE ACTION BUTTONS (Chalk, Strike, Run)
+            // ----------------------------------------------------------------------------
+            document.getElementById('btn-touch-ember').addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                sfx.init();
+                dropChalkMarker();
+            }, { passive: false });
+
+            document.getElementById('btn-touch-bash').addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                sfx.init();
+                tryStrikeWall();
+            }, { passive: false });
+
+            const btnTouchSprint = document.getElementById('btn-touch-sprint');
+            btnTouchSprint.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                sfx.init();
+                input.sprint = true;
+                btnTouchSprint.classList.add('border-[#9ec48e]', 'bg-[#2c3827]');
+            }, { passive: false });
+
+            const stopTouchSprint = (e) => {
+                e.preventDefault();
+                input.sprint = false;
+                btnTouchSprint.classList.remove('border-[#9ec48e]', 'bg-[#2c3827]');
+            };
+            btnTouchSprint.addEventListener('touchend', stopTouchSprint, { passive: false });
+            btnTouchSprint.addEventListener('touchcancel', stopTouchSprint, { passive: false });
+
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+
+            // ============================================================================
+            // 12. MAIN GAMEPLAY & RENDERING LOOP
+            // ============================================================================
+            const clock = new THREE.Clock();
+
+            function updateGameplay(dt, elapsed) {
+                timeRemaining -= dt;
+                if (timeRemaining <= 0) {
+                    timeRemaining = 0;
+                    updateHUD();
+                    currentState = STATE.LOST;
+                    if (document.pointerLockElement) {
+                        suppressNextUnlockPause = true;
+                        document.exitPointerLock();
+                    }
+                    btnSecondaryRestart.textContent = 'Reset to Depth I';
+                    showOverlayModal(
+                        `Depth ${toRoman(currentLevel)} — Torch Extinguished`,
+                        'Lost to the Dark',
+                        `Your last ember died on Depth ${toRoman(currentLevel)} (${GRID_SIZE}×${GRID_SIZE} labyrinth) before the oak gate could be unbarred.`,
+                        `Retry Depth ${toRoman(currentLevel)}`,
+                        currentLevel > 1
+                    );
+                    return;
+                }
+
+                if (input.turnLeft) player.yaw += TURN_SPEED * dt;
+                if (input.turnRight) player.yaw -= TURN_SPEED * dt;
+
+                const forwardX = -Math.sin(player.yaw);
+                const forwardZ = -Math.cos(player.yaw);
+                const rightX = Math.cos(player.yaw);
+                const rightZ = -Math.sin(player.yaw);
+
+                let forwardIntent = (input.forward ? 1 : 0) - (input.backward ? 1 : 0) + input.joyY;
+                let strafeIntent = (input.right ? 1 : 0) - (input.left ? 1 : 0) + input.joyX;
+
+                let moveX = forwardX * forwardIntent + rightX * strafeIntent;
+                let moveZ = forwardZ * forwardIntent + rightZ * strafeIntent;
+
+                const moveMag = Math.hypot(moveX, moveZ);
+                player.isMoving = moveMag > 0.08;
+
+                // Auto-sprint if pushing analog stick all the way to the rim or holding Run
+                const stickFullPush = Math.hypot(input.joyX, input.joyY) > 0.92;
+                const wantsSprint = input.sprint || stickFullPush;
+
+                if (player.isMoving && wantsSprint && player.stamina > 1.0) {
+                    player.isSprinting = true;
+                    player.stamina = Math.max(0, player.stamina - 24 * dt);
+                } else {
+                    player.isSprinting = false;
+                    player.stamina = Math.min(100, player.stamina + 16 * dt);
+                }
+
+                const targetFov = player.isSprinting ? 81.5 : 75.0;
+                camera.fov += (targetFov - camera.fov) * Math.min(1, dt * 8);
+                camera.updateProjectionMatrix();
+
+                if (player.isMoving) {
+                    const clampedMag = Math.min(1.0, moveMag);
+                    moveX = (moveX / moveMag) * clampedMag;
+                    moveZ = (moveZ / moveMag) * clampedMag;
+
+                    const speed = MOVE_SPEED * (player.isSprinting ? SPRINT_MULTIPLIER : 1.0);
+                    const nextX = player.x + moveX * speed * dt;
+                    const nextZ = player.z + moveZ * speed * dt;
+
+                    if (!checkCircleWallCollision(nextX, player.z, PLAYER_RADIUS)) {
+                        player.x = nextX;
+                    }
+                    if (!checkCircleWallCollision(player.x, nextZ, PLAYER_RADIUS)) {
+                        player.z = nextZ;
+                    }
+
+                    markExploredAroundPlayer();
+
+                    const bobFreq = player.isSprinting ? 13.5 : 9.2;
+                    player.bobPhase += dt * bobFreq * clampedMag;
+                    const stepSin = Math.sin(player.bobPhase);
+                    if (player.lastStepSin >= 0 && stepSin < 0) {
+                        sfx.playFootstep(player.isSprinting);
+                    }
+                    player.lastStepSin = stepSin;
+                } else {
+                    player.bobPhase = 0;
+                }
+
+                const bobOffset = player.isMoving ? Math.sin(player.bobPhase) * 0.045 : 0;
+                camera.position.set(player.x, EYE_HEIGHT + bobOffset, player.z);
+                camera.rotation.set(player.pitch, player.yaw, 0);
+
+                const fuelRatio = Math.max(0.18, timeRemaining / ROUND_TIME_SEC);
+                const flicker = Math.sin(elapsed * 17.0) * 0.08 + Math.cos(elapsed * 29.0) * 0.05;
+                playerTorchLight.position.set(
+                    player.x - Math.sin(player.yaw) * 0.25,
+                    EYE_HEIGHT + 0.1,
+                    player.z - Math.cos(player.yaw) * 0.25
+                );
+                playerTorchLight.intensity = (1.85 * fuelRatio) + flicker;
+                playerTorchLight.distance = 6.5 + 8.5 * fuelRatio;
+
+                const swayX = Math.cos(player.bobPhase * 0.5) * 0.015;
+                const swayY = Math.abs(Math.sin(player.bobPhase)) * 0.018;
+                let bashRotX = 0;
+                if (player.bashAnimTimer > 0) {
+                    player.bashAnimTimer = Math.max(0, player.bashAnimTimer - dt);
+                    bashRotX = -Math.sin((player.bashAnimTimer / 0.28) * Math.PI) * 0.85;
+                }
+                handTorchGroup.position.set(0.33 + swayX, -0.27 - swayY, -0.48);
+                handTorchGroup.rotation.set(0.18 + bashRotX, -0.15, -0.08);
+                const flameScale = Math.max(0.35, fuelRatio) + flicker * 0.3;
+                handFlameMesh.scale.set(flameScale, flameScale, flameScale);
+
+                if (player.keyAnimTimer > 0) {
+                    player.keyAnimTimer = Math.max(0, player.keyAnimTimer - dt);
+                    handKeyGroup.position.y = -0.22;
+                    handKeyGroup.rotation.y += dt * 3.2;
+                } else {
+                    handKeyGroup.position.y += (-0.58 - handKeyGroup.position.y) * Math.min(1, dt * 8);
+                }
+
+                let minKeyDist = 999;
+                keyObjects.forEach((k) => {
+                    if (k.collected) return;
+                    k.keyMeshGroup.rotation.y += dt * 1.8;
+                    k.keyMeshGroup.position.y = 1.42 + Math.sin(elapsed * 3.0 + k.id) * 0.06;
+
+                    const dist = Math.hypot(player.x - k.x, player.z - k.z);
+                    if (dist < minKeyDist) minKeyDist = dist;
+
+                    if (dist < 1.15) {
+                        k.collected = true;
+                        k.keyMeshGroup.visible = false;
+                        k.keyLight.intensity = 0;
+                        keysCollected++;
+                        player.keyAnimTimer = 1.6;
+                        sfx.playKeyPickup();
+
+                        if (keysCollected >= TOTAL_KEYS && exitGate) {
+                            exitGate.unlocked = true;
+                            exitGate.gateLanternMat.color.setHex(0x84a97c);
+                            exitGate.gateLanternMat.emissive.setHex(0x2d5a27);
+                            exitGate.gateLight.color.setHex(0x84a97c);
+                            sfx.playGateUnbar();
+                            showToast('All Keys Acquired — The Oak Gate Is Unbarred');
+                        } else {
+                            showToast(`Wrought-Iron Key Acquired (${keysCollected}/${TOTAL_KEYS})`);
+                        }
+                    }
+                });
+                sfx.updateSpatialHum(minKeyDist, elapsed);
+
+                oilPots.forEach((pot) => {
+                    if (pot.used) return;
+                    pot.flame.scale.y = 1.0 + Math.sin(elapsed * 14 + pot.x) * 0.15;
+                    const dist = Math.hypot(player.x - pot.x, player.z - pot.z);
+                    if (dist < 1.15) {
+                        pot.used = true;
+                        pot.flame.visible = false;
+                        pot.light.intensity = 0;
+                        timeRemaining = Math.min(ROUND_TIME_SEC, timeRemaining + 20.0);
+                        sfx.playOilFlare();
+                        showToast('Torch Replenished (+20s Flame)');
+                    }
+                });
+
+                spikeTraps.forEach((trap) => {
+                    if (trap.cooldown > 0) trap.cooldown -= dt;
+                    const dist = Math.hypot(player.x - trap.x, player.z - trap.z);
+                    if (dist < 0.85 && trap.cooldown <= 0) {
+                        trap.cooldown = 2.6;
+                        trap.spikeHeight = 0.02;
+                        timeRemaining = Math.max(1, timeRemaining - 8.0);
+                        sfx.playSpikeTrap();
+                        vignetteEl.classList.add('damage-flash');
+                        setTimeout(() => vignetteEl.classList.remove('damage-flash'), 320);
+                        showToast('Iron Floor Spikes! (-8s Torch Flame)');
+                    }
+                    trap.spikeHeight += (-0.32 - trap.spikeHeight) * Math.min(1, dt * 4.5);
+                    trap.spikesGroup.position.y = trap.spikeHeight;
+                });
+
+                let promptText = '';
+                if (exitGate) {
+                    if (exitGate.unlocked && exitGate.openAngle < 1.45) {
+                        exitGate.openAngle = Math.min(1.45, exitGate.openAngle + dt * 1.1);
+                        exitGate.doorPivot.rotation.y = exitGate.openAngle;
+                    }
+
+                    const gateDist = Math.hypot(player.x - exitGate.x, player.z - exitGate.z);
+                    if (gateDist < 2.2) {
+                        if (exitGate.unlocked) {
+                            if (gateDist < 1.25) {
+                                currentState = STATE.WON;
+                                sfx.updateSpatialHum(999, elapsed);
+                                if (document.pointerLockElement) {
+                                    suppressNextUnlockPause = true;
+                                    document.exitPointerLock();
+                                }
+                                const nextLvl = currentLevel + 1;
+                                const nextGrid = Math.min(19, 11 + (nextLvl - 1) * 2);
+                                const nextKeys = Math.min(5, 2 + Math.floor(nextLvl / 2));
+                                const nextTitle = LEVEL_TITLES[Math.min(nextLvl - 1, LEVEL_TITLES.length - 1)];
+                                btnSecondaryRestart.textContent = 'Restart Depth I';
+                                showOverlayModal(
+                                    `Depth ${toRoman(currentLevel)} Cleared`,
+                                    `Descend to Depth ${toRoman(nextLvl)}`,
+                                    `You escaped with ${Math.ceil(timeRemaining)}s of torchlight left. Next: "${nextTitle}" — a ${nextGrid}×${nextGrid} vault requiring ${nextKeys} Iron Keys with heavier fog and more floor traps.`,
+                                    `Enter Depth ${toRoman(nextLvl)}`,
+                                    true
+                                );
+                                return;
+                            }
+                        } else {
+                            promptText = `Barred Oak Gate — Requires ${TOTAL_KEYS - keysCollected} More Iron Key${TOTAL_KEYS - keysCollected > 1 ? 's' : ''}`;
+                        }
+                    }
+                }
+
+                const fwdX = -Math.sin(player.yaw);
+                const fwdZ = -Math.cos(player.yaw);
+                breakableWalls.forEach((bw) => {
+                    if (bw.broken) return;
+                    const dx = bw.x - player.x;
+                    const dz = bw.z - player.z;
+                    const d = Math.hypot(dx, dz);
+                    if (d < 2.8 && (dx * fwdX + dz * fwdZ) / (d || 1) > 0.5) {
+                        promptText = isTouchDevice
+                            ? 'Fractured Masonry — Tap [Strike] to Shatter'
+                            : 'Fractured Masonry — Press [E] or Click to Strike';
+                    }
+                });
+
+                if (promptText) {
+                    proximityPromptEl.textContent = promptText;
+                    proximityPromptEl.classList.remove('hidden');
+                } else {
+                    proximityPromptEl.classList.add('hidden');
+                }
+
+                updateHUD();
+                renderMinimap();
+                renderCompass();
+            }
+
+            function animate() {
+                requestAnimationFrame(animate);
+                const dt = Math.min(clock.getDelta(), 0.1);
+                const elapsed = clock.getElapsedTime();
+
+                torchLights.forEach((t) => {
+                    const wave = Math.sin(elapsed * 13.0 + t.phase) * 0.14 + Math.cos(elapsed * 23.0 + t.phase) * 0.08;
+                    t.light.intensity = t.baseIntensity + wave;
+                    t.flameMesh.scale.y = 1.0 + wave * 0.5;
+                });
+
+                if (dustSystem) {
+                    dustSystem.rotation.y = elapsed * 0.015;
+                }
+
+                if (currentState === STATE.PLAYING) {
+                    updateGameplay(dt, elapsed);
+                }
+
+                renderer.render(scene, camera);
+            }
+
+            buildLabyrinthWorld();
+            updateHUD();
+            renderMinimap();
+            renderCompass();
+            animate();
+        })();
+    </script>
+</body>
+</html>
